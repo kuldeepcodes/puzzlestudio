@@ -1,0 +1,22 @@
+# PuzzleStudio has zero dependencies and zero build step.
+# Nothing here should ever need installing — this file only keeps OS/editor cruft out.
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Node (only ever used for tools/smoke-test.js, which needs no packages)
+node_modules/
+npm-debug.log*
+package-lock.json
+
+# Local scratch
+/tmp/
+*.local
