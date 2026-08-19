@@ -57,12 +57,14 @@
   };
 
   /* ------------------------------------------------------ need -> supply -- */
-  // Which `provides` tokens relieve which failing stat.
+  // Which `provides` tokens relieve which failing stat. These strings must match
+  // the tokens engines actually declare — 'intel' is what the deduction engines
+  // provide, and it was missing here, so their morale relief never fired.
   var RELIEF = {
     light:  ['light_source', 'fire', 'power'],
     health: ['medical', 'triage', 'shelter', 'rest'],
     energy: ['food', 'rest', 'shelter'],
-    morale: ['ally', 'comfort', 'information', 'trade']
+    morale: ['ally', 'comfort', 'information', 'intel', 'trade']
   };
 
   var ALLY_MAGNETS = ['allocation', 'triage', 'barter', 'trade', 'ally'];
@@ -133,8 +135,11 @@
       if (ctx.state.hasTag(e.tagHooks[i])) s += 1.6;
     }
     s = Math.min(3.2, s);
-    // OVERRIDE RULE: an ally in the pack pulls hard toward allocation/barter.
-    if (ctx.state.hasTag('has_ally') && isAllyMagnet(e)) s += 4;
+    // An ally in the pack pulls toward allocation/barter. Kept below the
+    // freshness ceiling on purpose: this is a standing bonus that never
+    // expires, so if it outranks the starvation guard it starves the rest of
+    // the roster permanently.
+    if (ctx.state.hasTag('has_ally') && isAllyMagnet(e)) s += 2.4;
     return s;
   }
 
@@ -151,8 +156,19 @@
 
   function freshness(e, ctx) {
     var d = ctx.state.depthSince(e.id);
-    if (d >= 999) return 2.5;                       // never played
-    return Math.min(2.0, Math.max(0, (d - 1) * 0.4));
+    // STARVATION GUARD. Every other term is bounded but can stack high: choice
+    // (~7), tag (~5.6 incl. the has_ally magnet), need (~5 per depleted stat,
+    // and they stack), profile, jitter. A small freshness cap therefore cannot
+    // rescue an engine that scores 0 for `need` and `tag` — logic_grid and
+    // patrol_routing relieve no stat and hook no tag, and at a cap of 2.0 they
+    // drew 0 hits in 1000 scenes, at 6.0 still only 3 and 5.
+    //
+    // So this has to be able to reach the same order of magnitude as the rest
+    // of the scoring. It grows the longer an engine sits idle and eventually
+    // outranks anything static, which is what guarantees all 20 engines and
+    // all 60 skins actually get seen across a long run.
+    if (d >= 999) return Math.min(14, 4 + ctx.state.depth * 0.35);   // never played
+    return Math.min(14, Math.max(0, (d - 1) * 0.6));
   }
 
   function scoreEngine(e, ctx) {
@@ -296,7 +312,11 @@
     var seen = ctx.state.seenSkins();
     return ctx.rng.weighted(engine.skins, function (s) {
       var w = ringWeight(from, s.biome);
-      if (!seen[engine.id + ':' + s.id]) w *= 2.2;        // show off unseen content
+      // Unseen skins dominate until they have been shown. A rarely-selected
+      // engine may only get a handful of scenes in a whole run, so a mild
+      // nudge is not enough to cover all three of its skins — biome adjacency
+      // would keep re-picking the same convenient one.
+      if (!seen[engine.id + ':' + s.id]) w *= 8;
       else if (ctx.state.last && ctx.state.last.skinId === s.id) w *= 0.35;
       // a crossroad that pointed at a biome nudges the skin too
       if (ctx.state.crossroad && ctx.state.crossroad.biome === s.biome) w *= 1.8;
