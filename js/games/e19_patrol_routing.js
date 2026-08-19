@@ -684,7 +684,7 @@
       var d = Math.abs(x - puzzle.x) + Math.abs(y - puzzle.y);
       if (d === 0) { advance(puzzle.x, puzzle.y, true); return; }
       if (d !== 1) return;
-      if (puzzle.walls[idx(x, y, n)]) { api.toast('Solid.', 'bad', 900); return; }
+      if (puzzle.walls[idx(x, y, n)]) { api.toast('Blocked.', 'bad', 900); return; }
       advance(x, y, false);
     }
 

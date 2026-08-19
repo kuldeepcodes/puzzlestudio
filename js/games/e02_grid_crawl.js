@@ -374,7 +374,7 @@
       if (finished || puzzle.arrived) return;
       if (Math.abs(x - puzzle.x) + Math.abs(y - puzzle.y) !== 1) return;
       if (x < 0 || y < 0 || x >= n || y >= n) return;
-      if (puzzle.grid[y][x] === 1) { api.toast('Solid.', 'bad', 1100); return; }
+      if (puzzle.grid[y][x] === 1) { api.toast('Blocked.', 'bad', 1100); return; }
       step(x, y);
     }
 

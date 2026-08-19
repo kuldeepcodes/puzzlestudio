@@ -168,13 +168,45 @@ tools/smoke-test.js     node tools/smoke-test.js
 
 ### The scenarios
 
-| # | engine | what it is |
-|---|---|---|
-| 01 | **Escape Code** 🚪 | Search a locked room for four digit clues that get more indirect as you go deeper. Enter the code, pick the lock, or force the door — three genuinely different exits with different costs and different consequences. *Office Lockdown · Ship Cabin · Bunker Airlock* |
-| 02 | **Grid Crawl** 🕯️ | Cross a braided maze where your sight radius is a function of your light, and every step burns it. Fuel caches sit deliberately off the shortest path. Beeline and arrive blind, or detour and arrive late but able to see. *The Dark Tunnel · Smoke-Filled Corridor · Whiteout Snowfield* |
+**20 puzzle engines × 3 re-themed skins each = 60 distinct encounters.**
 
-Eighteen more are being written against `CONTRACT.md`. The game plays correctly with
-however many happen to be present.
+An *engine* is the mechanic and all the code. A *skin* is pure data that re-themes it — new
+biome, title, story, palette and noun labels. The same balance-scale engine is
+*Contaminated Canisters* in the wilderness and *Counterfeit Tokens* in a city market. That
+is also how narrative continuity works: the Director picks the **engine** by playstyle and
+need, then picks the **skin** by biome adjacency, so almost any puzzle can appear anywhere
+without the story lurching.
+
+| # | Engine | The three scenarios it appears as |
+|---|---|---|
+| 1 | 🚪 **Escape Code** | Office Lockdown *(indoor)* · Ship Cabin *(water)* · Bunker Airlock *(shelter)* |
+| 2 | 🕯️ **Grid Crawl** | The Dark Tunnel *(underground)* · Smoke-Filled Corridor *(indoor)* · Whiteout Snowfield *(wilderness)* |
+| 3 | 🎒 **Knapsack** | The Collapsed Store *(underground)* · Evacuation Pack *(urban)* · Lifeboat Locker *(water)* |
+| 4 | 🛶 **Constraint Crossing** | The Flooded Crossing *(water)* · Rope Bridge Ferry *(wilderness)* · The Weight Limit *(urban)* |
+| 5 | ⚡ **Circuit Rotation** | The Dead Substation *(industrial)* · Coolant Gallery *(industrial)* · The Dry Channels *(wilderness)* |
+| 6 | 📻 **Cipher Decode** | The Relay Tower *(industrial)* · The Scratched Journal *(indoor)* · The Buoy Light *(water)* |
+| 7 | ⚖️ **Balance Scales** | Contaminated Canisters *(wilderness)* · Counterfeit Tokens *(urban)* · Faulty Oxygen Cylinders *(industrial)* |
+| 8 | 🪪 **Logic Grid** | Restricted Access *(urban)* · Who Took the Medkit *(shelter)* · Crew Manifest *(water)* |
+| 9 | 🔧 **Dependency Order** | Pressure Release Valves *(industrial)* · Reactor Startup *(industrial)* · Dam Sluice Gates *(water)* |
+| 10 | 🥫 **Allocation Triage** | Storm Shelter Rations *(shelter)* · Medicine Convoy *(urban)* · Fuel Split *(wilderness)* |
+| 11 | 🪙 **Barter Graph** | The Underpass Market *(urban)* · The Trade Circle *(wilderness)* · The Dockside Fence *(water)* |
+| 12 | 🏃 **Timing Bar** | The Rooftop Gap *(urban)* · The Conveyor Line *(industrial)* · The Rockfall Drift *(underground)* |
+| 13 | ☠️ **Adjacency Deduction** | The Unstable Floor *(indoor)* · The Marked Field *(wilderness)* · Thin Ice *(water)* |
+| 14 | 🚑 **Priority Sort** | The Triage Ward *(shelter)* · The Evac Queue *(urban)* · The Distress Board *(industrial)* |
+| 15 | 🪣 **Measuring** | Fuel Mixing *(industrial)* · Antidote Dilution *(shelter)* · Water Ration Split *(wilderness)* |
+| 16 | 📦 **Polyomino Packing** | Cargo Loading *(urban)* · Lifeboat Stowage *(water)* · Mine Cart Packing *(underground)* |
+| 17 | 📡 **Triangulation** | Beacon Hunt *(wilderness)* · Cell Tower Trace *(urban)* · Sonar Ping *(water)* |
+| 18 | 🧊 **Sliding Block** | Jammed Motor Pool *(urban)* · Crate-Blocked Hatch *(industrial)* · Ice-Jammed Sluice *(water)* |
+| 19 | 👁️ **Patrol Routing** | Night Watch *(urban)* · Searchlight Yard *(industrial)* · Predator Range *(wilderness)* |
+| 20 | 🧮 **Numeric Constraint** | Ration Ledger *(shelter)* · Payload Manifest *(industrial)* · Seed Store Audit *(wilderness)* |
+
+A run the Director can genuinely produce:
+
+`Office Lockdown` *(you force the door — loud)* → `The Collapsed Store` *(grab rope and a
+flare)* → `The Dark Tunnel` *(the rope opens the shaft shortcut)* → *light critical* →
+`The Dead Substation` → `The Relay Tower` *(you answer the call — you have an ally now)* →
+`Storm Shelter Rations` *(your ally is one of the survivors)* → `Thin Ice` → `Sonar Ping` →
+… and onward, forever.
 
 ---
 
