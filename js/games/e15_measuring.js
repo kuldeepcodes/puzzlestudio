@@ -53,6 +53,7 @@
       solve: 'Exactly %T% litres, dead level with the mark.',
       failLine: 'You lose the thread of it and end up with a yard full of fuel.',
       item: 'fuel', bonus: 'canister',
+      relief: { light: 10 },
       stay: { icon: '\uD83D\uDEE2\uFE0F', title: 'Draw off everything left', desc: 'Another twenty minutes and every empty can on the rack goes with you.' },
       go:   { icon: '\uD83C\uDFC3', title: 'Take the charge and run it over', desc: 'One measure, both hands, and the generator shed before dark.' }
     },
@@ -72,6 +73,7 @@
       solve: 'Exactly %T% millilitres, sitting flat on the line.',
       failLine: 'You lose count somewhere in the middle and dare not use any of it.',
       item: 'medkit', bonus: 'bandage',
+      relief: { health: 10 },
       stay: { icon: '\uD83E\uDE79', title: 'Mix a second dose', desc: 'There is enough for one more if you are quick, and there is always one more.' },
       go:   { icon: '\uD83C\uDFC3', title: 'Get the dose down the hall', desc: 'It is measured. Standing here admiring it does nothing for anybody.' }
     },
@@ -91,6 +93,7 @@
       solve: 'Exactly %T% litres, level with the rim.',
       failLine: 'Half of it is in the snow and nobody trusts the count now.',
       item: 'water', bonus: 'ration',
+      relief: { energy: 12 },
       stay: { icon: '\uD83E\uDEA3', title: 'Fill everything you can carry', desc: 'Weight now against thirst later. It is not a close argument.' },
       go:   { icon: '\uD83C\uDFC3', title: 'Move while there is light', desc: 'You have the measure. Water you cannot carry is water for somebody else.' }
     }
@@ -681,6 +684,7 @@
       var tight = puzzle.moves <= puzzle.optimal + 1;
       var frugal = puzzle.wasted === 0;
       var stayed = choice === 'scavenge';
+      var relief = C.relief || {};
 
       var tags = ['measured_it_out'];
       if (frugal) tags.push('wasted_nothing');
@@ -688,9 +692,12 @@
 
       api.finish({
         outcome: clean ? 'success' : 'partial',
-        stats: clean
-          ? { morale: 8, energy: -4 - puzzle.tier, health: 0 }
-          : { morale: 2, energy: -7 - puzzle.tier },
+        stats: {
+          morale: clean ? 8 : 2,
+          energy: (clean ? -4 : -7) - puzzle.tier + (relief.energy || 0) * (clean ? 1 : 0.5),
+          health: (relief.health || 0) * (clean ? 1 : 0.5),
+          light: (relief.light || 0) * (clean ? 1 : 0.5)
+        },
         gain: stayed ? [C.item, C.bonus] : [C.item],
         lose: [],
         tags: tags.concat(stayed ? ['loaded_up'] : ['travelled_light']),
@@ -814,10 +821,16 @@
     var moves = puzzle.moves + line.length;
     var stayed = rng.chance(0.45);
     var C = puzzle.content;
+    var relief = C.relief || {};
 
     return {
       outcome: 'success',
-      stats: { morale: 8, energy: -4 - puzzle.tier },
+      stats: {
+        morale: 8,
+        energy: -4 - puzzle.tier + (relief.energy || 0),
+        health: relief.health || 0,
+        light: relief.light || 0
+      },
       gain: stayed ? [C.item, C.bonus] : [C.item],
       lose: [],
       tags: ['measured_it_out', 'wasted_nothing'],
@@ -837,7 +850,7 @@
     blurb: 'Get an exact volume out of vessels that are marked for anything but.',
 
     favors:   { logic: 3 },
-    provides: ['supplies', 'rest', 'food'],
+    provides: ['supplies', 'food', 'medical'],
     tagHooks: ['has_rations', 'wasted_nothing'],
     requires: function (state) { return state.stats.morale > 8; },
 
