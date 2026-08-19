@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PuzzleStudio — The Long Way Out</title>
+<meta name="description" content="An endless, branching survival puzzle game. No install, no server, no dependencies.">
+
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/skins.css">
+
+<!--
+  PuzzleStudio boot order.
+
+  HARD RULES (see CONTRACT.md):
+    * classic <script> tags only — NEVER type="module" (ES modules die on file:// via CORS)
+    * never fetch()/XHR a local file (also CORS-blocked on file://)
+    * per-engine scripts are NOT listed here. js/core/loader.js injects them at runtime
+      from its own hardcoded manifest, so adding an engine touches exactly ONE new file.
+-->
+<script src="js/core/rng.js"></script>
+<script src="js/core/state.js"></script>
+<script src="js/core/profile.js"></script>
+<script src="js/core/registry.js"></script>
+<script src="js/core/director.js"></script>
+<script src="js/core/save.js"></script>
+<script src="js/core/ui.js"></script>
+<script src="js/core/crossroad.js"></script>
+<script src="js/core/engine.js"></script>
+<script src="js/main.js"></script>
+<!-- loader.js MUST be last: it injects js/games/*.js then calls PuzzleStudio.engine.boot() -->
+<script src="js/core/loader.js"></script>
+</head>
+<body>
+  <div id="ps-root" class="ps-root pal-amber"></div>
+  <noscript>
+    <p style="color:#e8ecf3;font:16px system-ui;padding:2rem">
+      PuzzleStudio needs JavaScript. Nothing else — no server, no install.
+    </p>
+  </noscript>
+</body>
+</html>

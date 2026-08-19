@@ -1,0 +1,90 @@
+/* ==========================================================================
+   PuzzleStudio — skins.css
+   The seven palettes a skin may declare via  { palette: 'amber' }.
+   ui.js swaps the class on #ps-root when a scene mounts; every colour in
+   base.css and in engine CSS derives from these four tokens, so a palette
+   swap retints the entire app including the background wash.
+
+   AVAILABLE PALETTES:  amber  moss  steel  ice  rust  ash  bone
+   Engines: pick the one that matches the skin's mood. Do NOT add new
+   palettes here — that would make this a shared file every session edits.
+   ========================================================================== */
+
+/* amber — lamplight, warning lights, warmth in the dark. Default. */
+.pal-amber {
+  --acc:      #e2a84e;
+  --acc-2:    #f8d493;
+  --acc-ink:  #1c1305;
+  --acc-glow: rgba(226,168,78,.38);
+  --acc-wash: rgba(226,168,78,.10);
+}
+
+/* moss — overgrowth, wilderness, damp green quiet. */
+.pal-moss {
+  --acc:      #6fbe7f;
+  --acc-2:    #b3e6bb;
+  --acc-ink:  #071a0c;
+  --acc-glow: rgba(111,190,127,.34);
+  --acc-wash: rgba(111,190,127,.09);
+}
+
+/* steel — offices, machinery, cold fluorescent competence. */
+.pal-steel {
+  --acc:      #7fa6cf;
+  --acc-2:    #c2dcf5;
+  --acc-ink:  #061019;
+  --acc-glow: rgba(127,166,207,.32);
+  --acc-wash: rgba(127,166,207,.09);
+}
+
+/* ice — water, snow, glass, held breath. */
+.pal-ice {
+  --acc:      #79d7e0;
+  --acc-2:    #c6f2f6;
+  --acc-ink:  #04181b;
+  --acc-glow: rgba(121,215,224,.34);
+  --acc-wash: rgba(121,215,224,.09);
+}
+
+/* rust — industrial decay, blood, heat, alarm. */
+.pal-rust {
+  --acc:      #dd7a55;
+  --acc-2:    #f5b294;
+  --acc-ink:  #1e0b05;
+  --acc-glow: rgba(221,122,85,.36);
+  --acc-wash: rgba(221,122,85,.10);
+}
+
+/* ash — smoke, concrete, urban night, neutral dread. */
+.pal-ash {
+  --acc:      #a6adbd;
+  --acc-2:    #dde2ec;
+  --acc-ink:  #0c0e13;
+  --acc-glow: rgba(166,173,189,.28);
+  --acc-wash: rgba(166,173,189,.08);
+}
+
+/* bone — paper, dust, bunkers, sterile safety. */
+.pal-bone {
+  --acc:      #d8c9a3;
+  --acc-2:    #f2e9d2;
+  --acc-ink:  #171308;
+  --acc-glow: rgba(216,201,163,.30);
+  --acc-wash: rgba(216,201,163,.09);
+}
+
+/* --------------------------------------------------------------------------
+   Biome atmosphere. director.js also sets a data-biome attribute on #ps-root
+   so a scene can pick up a subtle environmental treatment independent of the
+   palette. Keep these extremely light — engines own their own look.
+   BIOMES: indoor underground water industrial urban wilderness shelter
+   -------------------------------------------------------------------------- */
+.ps-root[data-biome] .ps-stage { transition: box-shadow 900ms var(--ease); }
+
+.ps-root[data-biome="underground"] .ps-stage { box-shadow: var(--sh-1), 0 0 120px rgba(0,0,0,.7) inset; }
+.ps-root[data-biome="water"]       .ps-stage { box-shadow: var(--sh-1), 0 0 90px rgba(60,140,175,.12) inset; }
+.ps-root[data-biome="industrial"]  .ps-stage { box-shadow: var(--sh-1), 0 0 90px rgba(190,110,60,.09) inset; }
+.ps-root[data-biome="urban"]       .ps-stage { box-shadow: var(--sh-1), 0 0 90px rgba(120,130,160,.09) inset; }
+.ps-root[data-biome="wilderness"]  .ps-stage { box-shadow: var(--sh-1), 0 0 90px rgba(90,150,110,.09) inset; }
+.ps-root[data-biome="shelter"]     .ps-stage { box-shadow: var(--sh-1), 0 0 70px rgba(210,195,160,.07) inset; }
+.ps-root[data-biome="indoor"]      .ps-stage { box-shadow: var(--sh-1), 0 0 70px rgba(120,150,190,.07) inset; }
