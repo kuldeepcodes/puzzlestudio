@@ -3,13 +3,35 @@
 An endless, branching survival puzzle game that runs by **double-clicking a file**.
 
 No server. No build step. No npm. No bundler. No CDN, no web fonts, no libraries, no
-analytics, no image assets. Clone it and open `index.html`. That is the whole install.
+analytics, no image assets.
+
+---
+
+## Play it online
+
+**→ [kuldeepcodes.github.io/puzzlestudio](https://kuldeepcodes.github.io/puzzlestudio/)**
+
+## Or play it offline — the same game, no server
+
+Download the repo and double-click `index.html`. That is the entire install.
 
 ```
 git clone https://github.com/kuldeepcodes/puzzlestudio
 cd puzzlestudio
 # now double-click index.html
 ```
+
+Both modes run **identical code**. There is no build output, no hosted-only path, and
+no "dev vs production" split — the hosted version is these exact files served over
+HTTP, and the local version is these exact files opened over `file://`.
+
+That dual-mode support is deliberate, and it is the constraint the whole architecture
+is built around. `file://` blocks ES modules and `fetch()` under CORS, so the game uses
+classic `<script>` tags, a single `PuzzleStudio` global, dynamically injected script
+tags for the engine files, and CSS carried as strings on each engine registration.
+Every path in the project is relative, so it works from a domain root, a sub-path, or a
+folder on your desktop. Nothing here needs the network once you have the files —
+put it on a USB stick and it still plays.
 
 ---
 
@@ -125,6 +147,7 @@ scores engines partly on how well their declared `favors` match that profile.
 ```
 index.html              the whole game. classic <script> tags, no modules
 CONTRACT.md             the authoritative engine-authoring spec
+.nojekyll               tells GitHub Pages to serve the tree verbatim
 css/base.css            theme tokens, app shell, HUD, stage, transitions
 css/skins.css           the 7 palettes: amber moss steel ice rust ash bone
 js/core/rng.js          seeded mulberry32 + string hash
