@@ -674,7 +674,7 @@
     blurb: 'One of them is wrong. The beam will answer three times, and then you decide.',
 
     favors:   { logic: 3, caution: 1 },
-    provides: ['supplies'],
+    provides: ['supplies', 'salvage'],
     tagHooks: [],
     requires: function () { return true; },
 
