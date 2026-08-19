@@ -442,8 +442,9 @@
     }
 
     function pick(arr) {
-      // Presentation only — never touches puzzle state, so determinism holds.
-      return arr[Math.floor(Math.random() * arr.length)];
+      // Flavour only, but it still has to come from the seeded rng: replaying a
+      // seed must reproduce the run exactly, including what the scene said to you.
+      return api.rng.pick(arr);
     }
 
     /* ------------------------------------------------------------ endings -- */
