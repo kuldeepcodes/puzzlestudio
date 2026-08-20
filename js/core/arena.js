@@ -1115,6 +1115,11 @@
         ctx.font = Math.round(tile * 0.56) + 'px ' + EMOJI_FONT;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+        // Same trap as the prop glyph: without this the icon inherits the
+        // shadow ellipse's 50% black and a plain-glyph patrol is invisible on
+        // a dark floor. Colour emoji ignore fillStyle, so it hides until
+        // somebody labels a guard with a letter.
+        ctx.fillStyle = rgba(pal.ink, 1);
         ctx.fillText(pt.icon, sx, sy);
         if (pt.alert > 0) {
           ctx.font = Math.round(tile * 0.4) + 'px ' + UI_FONT;
@@ -1182,6 +1187,10 @@
       ctx.font = Math.round(tile * 0.66) + 'px ' + EMOJI_FONT;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      // restore() above put the glow *gradient* back as the fill, which would
+      // paint a plain-glyph avatar in a wash that fades to transparent at its
+      // own edges. setAvatar() is public API, so this has to be explicit.
+      ctx.fillStyle = rgba(pal.ink, 1);
       ctx.fillText(p.icon, 0, 0);
       ctx.restore();
     }
