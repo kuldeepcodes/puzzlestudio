@@ -688,12 +688,24 @@ it does when the thing it measures is **degenerate rather than wrong**:
 | a weight of `0.05` on "give up" | a pool with **one** element | weighted choice ignores weight; the bot surrendered every time |
 | a `RELIEF` key named `'information'` | a name matching **nothing** | engines declare `'intel'`; the rule could never fire |
 | an override branch | a count of **zero** | `picked-lock` ran 3 times per 1000 and nothing asserted on it |
-| a solver seeded with `safe = {}` | an input set that is **empty** | already-safe cells read as unknown; 83% of deductions lost |
+| a solver seeded `safe = {}` | an input set that is **empty** | already-safe cells read as unknown, disabling a deduction rule entirely |
 | a liveness assertion | a sample **too small to contain the event** | short runs failed with nothing wrong |
 
 A guard that cannot verify something should say so, not pass quietly and not fail
 loudly. The liveness check is the worked example: below its floor it prints what it
 did not see and does not assert. **Degrade honestly.**
+
+**Add your row when you find one.** The table is what does the work here, not the
+principle above it — "test it degenerate" reads as advice and advice in a checklist
+gets ticked without being done, whereas *a pool of one* and *a name matching nothing*
+are things you can actually go and check in five minutes. The list is meant to grow.
+
+One caution learned from writing it: the solver row originally carried a specific
+figure for how much detection was lost, taken from the report that found the bug. An
+independent re-measurement with a different sampling regime got a materially different
+number — both were real measurements of a real bug, but the magnitude turned out to
+depend heavily on how much of the board had been revealed. **State the mechanism, which
+reproduces; be careful quoting a headline number that might not.**
 
 ---
 
