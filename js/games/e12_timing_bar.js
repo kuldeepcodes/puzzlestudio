@@ -685,7 +685,7 @@
     var cRun  = arena.chip('Clean', '\u2705');
     var mWin  = arena.meter('Crossing', '\u23F1\uFE0F');
 
-    arena.note('The crossing is only there while the mark is in the lit band. Back off, line it up, and go on the beat.');
+    arena.note('The crossing is only there for a moment at a time. Watch the mark, back off, line it up, and go on the beat.');
     arena.button('\u21A9 Not worth it \u2014 go around', bailOut, 'pz-btn--danger');
 
     function paintHud() {
