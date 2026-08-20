@@ -690,6 +690,7 @@ it does when the thing it measures is **degenerate rather than wrong**:
 | an override branch | a count of **zero** | `picked-lock` ran 3 times per 1000 and nothing asserted on it |
 | a solver seeded `safe = {}` | an input set that is **empty** | already-safe cells read as unknown, disabling a deduction rule entirely |
 | a liveness assertion | a sample **too small to contain the event** | short runs failed with nothing wrong |
+| grepping for a marker string | the file **also talks about** the marker | searching for `"FAULT INJECTION"` matched a *comment* about fault injection and reported broken code that was already fixed |
 
 A guard that cannot verify something should say so, not pass quietly and not fail
 loudly. The liveness check is the worked example: below its floor it prints what it
@@ -706,6 +707,20 @@ independent re-measurement with a different sampling regime got a materially dif
 number — both were real measurements of a real bug, but the magnitude turned out to
 depend heavily on how much of the board had been revealed. **State the mechanism, which
 reproduces; be careful quoting a headline number that might not.**
+
+And the last row is worth reading twice, because it is the general case of the other
+five. A marker is a **proxy** for the property you care about, and a proxy drifts from
+its property the moment anyone writes about it — the grep asked "does this string appear
+in the file", which stopped meaning "is this code broken" as soon as a comment mentioned
+it. Checking `destroy()`'s actual first statements cannot drift, because it asks the real
+question.
+
+Note also that these failures are not biased toward false alarms. One check here
+reported a catastrophe that did not exist; another reported breakage that had already
+been fixed. A measurement that isn't asking the question it appears to ask is simply
+**uncorrelated** with the truth, and which direction it lands is luck. That is the
+argument for fault injection over reasoning about a check: injecting the failure pins
+the measurement to the property in both directions at once.
 
 ---
 
