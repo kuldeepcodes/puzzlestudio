@@ -649,7 +649,7 @@
           if (faulty[r + ':' + c] && v) cls += ' is-fault';
           var e = cellEls[r][c];
           e.className = cls;
-          e.disabled = finished;
+          e.disabled = finished || puzzle.solved;
           // The wedge marks are children, so only replace the text node.
           if (e.firstChild && e.firstChild.nodeType === 3) e.firstChild.nodeValue = v ? String(v) : '';
           else e.insertBefore(document.createTextNode(v ? String(v) : ''), e.firstChild || null);
@@ -688,6 +688,7 @@
     }
 
     function paintKeys() {
+      var locked = finished || puzzle.solved;
       for (var d = 1; d <= puzzle.V; d++) {
         var btn = keyBtns[d - 1];
         var spent = false;
@@ -696,9 +697,9 @@
           spent = cand.indexOf(d) < 0;
         }
         btn.className = 'pz-ledger-key' + (spent ? ' is-spent' : '');
-        btn.disabled = finished || !sel || puzzle.given[sel[0]][sel[1]];
+        btn.disabled = locked || !sel || puzzle.given[sel[0]][sel[1]];
       }
-      keyBtns[puzzle.V].disabled = finished || !sel || puzzle.given[sel[0]][sel[1]];
+      keyBtns[puzzle.V].disabled = locked || !sel || puzzle.given[sel[0]][sel[1]];
     }
 
     function paintRead(f) {
@@ -848,7 +849,7 @@
     }
 
     function write(d) {
-      if (finished || !sel) return;
+      if (finished || puzzle.solved || !sel) return;
       var r = sel[0], c = sel[1];
       if (puzzle.given[r][c]) { api.toast('That figure is already signed off.', 'info', 1400); return; }
       puzzle.grid[r][c] = d;
@@ -893,7 +894,7 @@
     /* ------------------------------------------------------------ endings -- */
 
     function closeCount() {
-      if (finished) return;
+      if (finished || puzzle.solved) return;
       if (!isComplete(puzzle)) { api.toast('There are still blanks. You cannot sign an incomplete count.', 'bad', 2400); return; }
       var f = faults(puzzle);
       puzzle.checks++;
@@ -923,6 +924,13 @@
         arena.closePanel();
         arena.note(C.solvedLine);
       }
+      // The count is closed: the sheet and both signing buttons go dead, so a
+      // solved ledger can never be signed off blind afterwards.
+      PS.ui.clear(actions);
+      PS.ui.append(actions, h('div', { class: 'pz-ledger-note', text:
+        'Signed and closed. The rest of it is not arithmetic any more.' }));
+      paint();
+
       PS.ui.clear(endBox);
       PS.ui.append(endBox, [
         h('div', { class: 'pz-ledger-reveal' }, [
@@ -971,7 +979,7 @@
 
     /** Sign it off wrong. The numbers do not care, but somebody will. */
     function signOff() {
-      if (finished) return;
+      if (finished || puzzle.solved) return;
       finished = true;
       puzzle.signedOff = true;
       var right = 0, total = 0, r, c;
