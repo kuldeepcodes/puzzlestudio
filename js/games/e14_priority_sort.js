@@ -27,6 +27,13 @@
      every build. The number it produces is the target on screen. It is always
      reachable, and reaching it takes real thought, because greedily sorting on
      any single column will not get you there.
+
+   THE WARD (arena)
+     You cannot triage a queue off a clipboard. Every casualty is somebody lying
+     in a bay, and their vitals are blank on the board until you have walked
+     over and assessed them in person. Ranking, though, genuinely is a list you
+     drag — so the ordering itself stays a panel, and it opens at the board at
+     the end of the corridor. Assess, then rank, then commit.
    ========================================================================== */
 (function (root) {
   'use strict';
@@ -331,6 +338,8 @@
   var CSS = [
     '.pz-prio{display:grid;grid-template-columns:minmax(0,1fr) minmax(250px,320px);gap:18px;align-items:start}',
     '@media (max-width:900px){.pz-prio{grid-template-columns:1fr}}',
+    '.pz-prio.is-panel{display:flex;flex-direction:column;gap:12px}',
+    '.pz-prio-stage{display:flex;flex-direction:column;gap:14px}',
 
     '.pz-prio-list{display:flex;flex-direction:column;gap:7px}',
 
@@ -338,12 +347,15 @@
     '  padding:9px 11px;border-radius:10px;border:1px solid var(--line);cursor:grab;',
     '  background:linear-gradient(180deg,var(--panel-2),var(--panel));box-shadow:var(--sh-1);',
     '  transition:border-color .18s var(--ease),transform .18s var(--ease),opacity .18s var(--ease)}',
+    '.pz-prio.is-panel .pz-prio-row{grid-template-columns:18px 26px minmax(0,1fr) auto;gap:7px;padding:8px 9px}',
+    '.pz-prio.is-panel .pz-prio-face{font-size:17px}',
     '.pz-prio-row:hover{border-color:color-mix(in srgb,var(--acc) 50%,var(--line));transform:translateX(2px)}',
     '.pz-prio-row.is-held{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset,0 10px 26px rgba(0,0,0,.5)}',
     '.pz-prio-row.is-drag{opacity:.4}',
     '.pz-prio-row.is-over{border-top:2px solid var(--acc)}',
     '.pz-prio-row.is-locked{cursor:default;opacity:.92}',
     '.pz-prio-row.is-locked:hover{transform:none}',
+    '.pz-prio-row.is-blank{border-style:dashed;border-color:var(--line-soft)}',
 
     '.pz-prio-rank{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--acc-2);text-align:center}',
     '.pz-prio-face{font-size:20px;line-height:1}',
@@ -358,6 +370,7 @@
     '.pz-prio-attr.is-child{color:#f6d08a;border-color:#5a4520;background:#2b1f0c}',
     '.pz-prio-attr.is-elder{color:#b48ce0;border-color:#3d2f52}',
     '.pz-prio-attr.is-mobile{color:#5fcf8d;border-color:#25422f}',
+    '.pz-prio-attr.is-unknown{color:var(--dimmer);border-style:dashed}',
 
     '.pz-prio-nudge{display:flex;flex-direction:column;gap:3px}',
     '.pz-prio-nudge button{width:26px;height:19px;border-radius:5px;border:1px solid var(--line);',
@@ -402,18 +415,39 @@
     var finished = false;
     var held = -1;          // click-to-pick-up index (position, not entry id)
     var dragFrom = -1;
+    var arena = null;
+    var seenIds = {};       // entry id -> assessed in person
+    var cSeen = null, cCost = null;
 
-    var listBox   = h('div', { class: 'pz-prio-list' });
-    var bookBox   = h('div', { class: 'pz-prio-book' });
-    var scoreBox  = h('div', { class: 'pz-prio-score' });
-    var noteBox   = h('div', {});
+    var stage = h('div', { class: 'pz-prio-stage' });
+    var mapHost = h('div', {});
+    var endBox = h('div', {});
+    var listBox = h('div', { class: 'pz-prio-list' });
+    var bookBox = h('div', { class: 'pz-prio-book' });
+    var scoreBox = h('div', { class: 'pz-prio-score' });
+    var noteBox = h('div', {});
     var actionBox = h('div', { class: 'pz-col' });
+    var panelRoot = h('div', { class: 'pz-prio' });
     var submitBtn = h('button', { class: 'pz-btn pz-btn--primary', type: 'button' }, ['\u2713 ' + C.actionWord]);
+
+    function assessed(e) { return !!seenIds[e.id]; }
+
+    function assessedCount() {
+      var c = 0;
+      for (var i = 0; i < puzzle.entries.length; i++) if (assessed(puzzle.entries[i])) c++;
+      return c;
+    }
+
+    function allAssessed() { return assessedCount() >= puzzle.entries.length; }
 
     /* -------------------------------------------------------------- rows -- */
 
     function attrChips(e) {
       var out = [];
+      if (!assessed(e)) {
+        out.push(h('span', { class: 'pz-prio-attr is-unknown', text: 'not assessed' }));
+        return out;
+      }
       out.push(h('span', {
         class: 'pz-prio-attr' + (e.severity >= 5 ? ' is-sev5' : (e.severity === 4 ? ' is-sev4' : '')),
         text: C.severityWord + ' ' + e.severity + '/5'
@@ -440,7 +474,8 @@
       }, ['\u25BC']);
 
       var r = h('div', {
-        class: 'pz-prio-row' + (held === pos ? ' is-held' : '') + (locked ? ' is-locked' : ''),
+        class: 'pz-prio-row' + (held === pos ? ' is-held' : '') + (locked ? ' is-locked' : '') +
+          (assessed(e) ? '' : ' is-blank'),
         draggable: locked ? null : 'true',
         title: locked ? '' : 'Click to pick up, click again where you want it. Or drag.'
       }, [
@@ -501,59 +536,151 @@
       move(held, pos);
     }
 
+    /* --------------------------------------------------------------- ward -- */
+    /* Bays down both sides of a corridor with the board at the far end. The
+       vitals are not on the board; they are on the person, and the only way to
+       read them is to go and stand over them.                                */
+
+    function wardMap(n) {
+      var cols = Math.max(1, Math.ceil(n / 2));
+      var w = cols * 3 + 5, hgt = 9;
+      var tiles = [], spots = [], x, y;
+      for (y = 0; y < hgt; y++) {
+        var line = [];
+        for (x = 0; x < w; x++) line.push((y === 0 || y === hgt - 1 || x === 0 || x === w - 1) ? 1 : 0);
+        tiles.push(line);
+      }
+      for (var i = 0; i < n; i++) {
+        var col = Math.floor(i / 2), top = (i % 2) === 0;
+        var bx = 2 + col * 3;
+        tiles[top ? 1 : hgt - 2][bx] = 1;                 // the trolley they are on
+        spots.push({ x: bx, y: top ? 2 : hgt - 3 });
+      }
+      // a nook for the board, so the far end of the corridor is somewhere
+      tiles[2][w - 3] = 1; tiles[3][w - 3] = 1;
+      tiles[hgt - 3][w - 3] = 1; tiles[hgt - 4][w - 3] = 1;
+      return { w: w, h: hgt, tiles: tiles, spots: spots, spawn: { x: 1, y: 4 }, desk: { x: w - 2, y: 4 } };
+    }
+
+    function buildWard() {
+      if (!PS.arena || typeof PS.arena.create !== 'function') return false;
+
+      var m = wardMap(puzzle.entries.length);
+      arena = PS.arena.create(mapHost, {
+        map: { w: m.w, h: m.h, tiles: m.tiles },
+        spawn: m.spawn,
+        avatar: '\uD83E\uDDCD',
+        light: state.stats.light,
+        lightCurve: function (v) { return 4.4 + Math.min(100, Math.max(0, v)) / 100 * 3.2; },
+        darkness: 0.55,
+        memory: 0.68
+      });
+      if (!arena) return false;
+      teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
+
+      cSeen = arena.chip('Assessed', '\uD83E\uDE7A');
+      cCost = arena.chip('Cost', '\u2696\uFE0F');
+
+      for (var i = 0; i < puzzle.entries.length; i++) {
+        (function (idx) {
+          var e = puzzle.entries[idx];
+          var spot = m.spots[idx];
+          if (!spot) return;
+          arena.prop({
+            x: spot.x, y: spot.y, icon: e.icon, label: e.name,
+            hint: 'assess them', trigger: 'proximity', radius: 1.4,
+            once: false, emits: 0.5,
+            onActivate: function () { assess(idx); }
+          });
+        })(i);
+      }
+
+      arena.station({
+        x: m.desk.x, y: m.desk.y, icon: '\uD83D\uDCCB', label: C.boardWord,
+        hint: 'set the order', radius: 1.4, emits: 1.9,
+        onEnter: function (panelEl) { PS.ui.append(panelEl, panelRoot); }
+      });
+
+      arena.note('Go round the bays first \u2014 nothing on the board fills itself in. Then set ' +
+        C.queueWord + ' at the board.');
+      return true;
+    }
+
+    function assess(idx) {
+      var e = puzzle.entries[idx];
+      if (seenIds[e.id] || finished) return;
+      seenIds[e.id] = true;
+
+      var bits = [C.severityWord + ' ' + e.severity + ' of 5', e.waited + ' minutes ' + C.waitWord];
+      if (e.child) bits.push('a child');
+      else if (e.elder) bits.push('elderly');
+      if (e.mobile) bits.push(C.mobileWord);
+      api.toast(e.name + ' \u2014 ' + bits.join(', ') + '.', e.severity >= 4 ? 'bad' : 'info', 4200);
+      repaint();
+    }
+
     /* ------------------------------------------------------------- board -- */
 
     function paintBook() {
       var counts = violationsByRule(puzzle.order, puzzle.entries, puzzle.rules);
+      var known = allAssessed() || puzzle.submitted;
       PS.ui.clear(bookBox);
       for (var r = 0; r < puzzle.rules.length; r++) {
         var rule = puzzle.rules[r];
         var v = counts[r];
-        bookBox.appendChild(h('div', { class: 'pz-prio-rule ' + (v ? 'is-broken' : 'is-clean') }, [
+        bookBox.appendChild(h('div', { class: 'pz-prio-rule ' + (known ? (v ? 'is-broken' : 'is-clean') : '') }, [
           h('div', { class: 'pz-prio-rule__h' }, [
             h('div', { class: 'pz-prio-rule__t', text: rule.title }),
             h('div', { class: 'pz-prio-rule__w', text: '\u00D7' + rule.weight })
           ]),
           h('div', { class: 'pz-prio-rule__b', text: rule.body }),
           h('div', { class: 'pz-prio-rule__v' },
-            [v === 0 ? 'satisfied' : v + ' pair' + (v === 1 ? '' : 's') + ' out of order \u2014 ' + (v * rule.weight) + ' points'])
+            [known
+              ? (v === 0 ? 'satisfied' : v + ' pair' + (v === 1 ? '' : 's') + ' out of order \u2014 ' + (v * rule.weight) + ' points')
+              : 'cannot be checked until everyone has been assessed'])
         ]));
       }
     }
 
     function paintScore() {
       var cur = puzzle.current;
-      var perfect = cur <= puzzle.best;
+      var known = allAssessed() || puzzle.submitted;
+      var perfect = known && cur <= puzzle.best;
       var span = Math.max(1, puzzle.worst - puzzle.best);
       var pct = Math.max(0, Math.min(100, ((cur - puzzle.best) / span) * 100));
 
       scoreBox.className = 'pz-prio-score' + (perfect ? ' is-perfect' : '');
       PS.ui.clear(scoreBox);
 
-      var fill = h('div', { class: 'pz-prio-score__fill', style: { width: pct + '%' } });
+      var fill = h('div', { class: 'pz-prio-score__fill', style: { width: (known ? pct : 0) + '%' } });
       var mark = h('div', { class: 'pz-prio-score__mark', style: { left: '0%' } });
 
       PS.ui.append(scoreBox, [
         h('div', { class: 'pz-prio-score__n' }, [
-          h('div', { class: 'pz-prio-score__big', text: String(cur) }),
-          h('div', { class: 'pz-prio-score__lab', text: 'violation points on the board' })
+          h('div', { class: 'pz-prio-score__big', text: known ? String(cur) : '\u2014' }),
+          h('div', { class: 'pz-prio-score__lab', text: known ? 'violation points on the board' : 'the board cannot score people you have not seen' })
         ]),
         h('div', { class: 'pz-prio-score__bar' }, [fill, mark]),
+        line('Assessed', assessedCount() + ' of ' + puzzle.entries.length),
         line('Best possible', String(puzzle.best)),
         line('Worst possible', String(puzzle.worst)),
-        line('Where you started', String(puzzle.startCost)),
         line('Changes made', String(puzzle.moves))
       ]);
 
       PS.ui.clear(noteBox);
       if (!puzzle.submitted) {
         noteBox.appendChild(h('div', { class: 'pz-prio-hint' }, [
-          perfect
-            ? 'That is the lowest total these protocols allow. Anything you change from here costs somebody.'
-            : 'No order satisfies every protocol \u2014 they contradict each other on purpose. ' +
-              'Aim for ' + puzzle.best + ', which is the least harm available, not zero.'
+          !known
+            ? (puzzle.entries.length - assessedCount()) + ' of them you have not been to see. You can commit this order without going \u2014 you will simply be ranking names.'
+            : (perfect
+              ? 'That is the lowest total these protocols allow. Anything you change from here costs somebody.'
+              : 'No order satisfies every protocol \u2014 they contradict each other on purpose. ' +
+                'Aim for ' + puzzle.best + ', which is the least harm available, not zero.')
         ]));
       }
+
+      if (cSeen) cSeen.set(assessedCount() + ' / ' + puzzle.entries.length, known ? null : 'warn');
+      if (cCost) cCost.set(known ? cur + ' / ' + puzzle.best + ' best' : 'unknown');
 
       function line(k, v) {
         return h('div', { class: 'pz-prio-score__row' }, [h('span', { text: k }), h('b', { text: v })]);
@@ -586,9 +713,18 @@
           ? 'Close to the best available. One or two people are behind where they should be.'
           : 'Defensible, but the protocols say you cost somebody their place.');
 
+      var blind = puzzle.entries.length - assessedCount();
+      if (arena) {
+        arena.closePanel();
+        arena.note(C.done);
+      }
+
       PS.ui.clear(actionBox);
-      PS.ui.append(actionBox, [
+      PS.ui.clear(endBox);
+      PS.ui.append(endBox, [
         h('div', { class: 'pz-intro', text: C.done + ' ' + verdict + ' (' + puzzle.current + ' against a best possible ' + puzzle.best + '.)' }),
+        blind > 0 ? h('div', { class: 'pz-prio-hint', text:
+          'You ranked ' + blind + ' of them without ever going to look at them. The numbers were there to be read.' }) : null,
         h('div', { class: 'pz-choices' }, [
           choiceBtn(C.stay, 'shelter'),
           choiceBtn(C.leave, 'signal')
@@ -670,7 +806,7 @@
       }, ['\u21A9 Hand the list to somebody else'])
     ]);
 
-    PS.ui.append(el, h('div', { class: 'pz-prio' }, [
+    PS.ui.append(panelRoot, [
       h('div', { class: 'pz-col' }, [
         listBox,
         h('div', { class: 'pz-note' }, [
@@ -694,12 +830,23 @@
           actionBox
         ])
       ])
-    ]));
+    ]);
+
+    PS.ui.append(stage, [mapHost, endBox]);
+    PS.ui.append(el, stage);
+
+    if (buildWard()) {
+      panelRoot.className = 'pz-prio is-panel';
+    } else {
+      // No arena layer: the whole ward is in front of you and nothing is hidden.
+      for (var q = 0; q < puzzle.entries.length; q++) seenIds[puzzle.entries[q].id] = true;
+      PS.ui.append(mapHost, panelRoot);
+    }
 
     repaint();
+    if (arena) arena.focus();
     teardownFns.push(function () { held = -1; dragFrom = -1; });
   }
-
   function unmount() {
     while (teardownFns.length) {
       try { teardownFns.pop()(); } catch (e) { /* keep unwinding */ }
