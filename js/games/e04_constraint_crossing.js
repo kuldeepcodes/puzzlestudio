@@ -44,6 +44,7 @@
       carrier: 'the raft', carrierIcon: '\uD83D\uDEF6',
       near: 'This side', far: 'The far side',
       cast: 'Pole across',
+      gap: 'the flood', gapIcon: '\uD83C\uDF0A',
       arrive: 'You stand dripping on the far bank with everything that made it.',
       cargo: [
         { key: 'fuelcan', n: 'Fuel can',     i: '\u26FD',            item: 'fuel' },
@@ -69,6 +70,7 @@
       carrier: 'the cradle', carrierIcon: '\uD83E\uDE9D',
       near: 'The near ledge', far: 'The far ledge',
       cast: 'Haul across',
+      gap: 'the gorge', gapIcon: '\uD83C\uDF2B\uFE0F',
       arrive: 'The cradle bumps the far ledge and you get your weight onto rock.',
       cargo: [
         { key: 'fuelcan', n: 'Stove fuel',     i: '\u26FD',          item: 'fuel' },
@@ -94,6 +96,7 @@
       carrier: 'the car', carrierIcon: '\uD83D\uDEC2',
       near: 'Sub-level', far: 'Street level',
       cast: 'Send the car',
+      gap: 'the shaft', gapIcon: '\uD83D\uDD73\uFE0F',
       arrive: 'The doors open on street level and something like air comes in.',
       cargo: [
         { key: 'fuelcan', n: 'Generator can', i: '\u26FD',           item: 'fuel' },
@@ -287,24 +290,58 @@
 
   function fullMask(puzzle) { return (1 << puzzle.cargo.length) - 1; }
 
+  /* ============================================================ THE WATER ==
+     Two banks with something impassable between them, and a carrier that is
+     only ever tied up at one of them. Laid out from the puzzle rather than
+     the rng, so build() keeps every draw it already made.                  */
+
+  var XING_W = 23, XING_H = 13;
+  var WATER_X0 = 10, WATER_X1 = 12;
+
+  function buildShore(puzzle) {
+    var W = XING_W, H = XING_H, x, y, i;
+    var tiles = [];
+    for (y = 0; y < H; y++) {
+      var row = [];
+      for (x = 0; x < W; x++) {
+        var edge = (x === 0 || y === 0 || x === W - 1 || y === H - 1);
+        row.push(edge || (x >= WATER_X0 && x <= WATER_X1) ? 1 : 0);
+      }
+      tiles.push(row);
+    }
+
+    var midY = (H - 1) >> 1;
+
+    /* Landing places for cargo: far enough back from the dock that stepping
+       off the carrier never picks something straight back up again. */
+    var SLOTS = [[3, 2], [6, 3], [7, 8], [3, 5], [6, 9], [8, 10], [3, 10]];
+    var near = [], far = [];
+    for (i = 0; i < SLOTS.length; i++) {
+      near.push({ x: SLOTS[i][0], y: SLOTS[i][1] });
+      far.push({ x: W - 1 - SLOTS[i][0], y: SLOTS[i][1] });
+    }
+
+    /* A little scenery on both shores so the two sides do not read as the
+       same empty rectangle twice. Never on a cargo slot or a dock. */
+    var ROCKS = [[5, 1], [2, 7], [7, 4], [5, 11], [8, 8]];
+    for (i = 0; i < ROCKS.length; i++) {
+      if (Math.abs(ROCKS[i][1] - midY) <= 1 && ROCKS[i][0] >= WATER_X0 - 2) continue;
+      tiles[ROCKS[i][1]][ROCKS[i][0]] = 1;
+      tiles[ROCKS[i][1]][W - 1 - ROCKS[i][0]] = 1;
+    }
+
+    return {
+      w: W, h: H, tiles: tiles,
+      nearDock: { x: WATER_X0 - 1, y: midY },
+      farDock:  { x: WATER_X1 + 1, y: midY },
+      spawn:    { x: 2, y: midY },
+      nearSlots: near, farSlots: far
+    };
+  }
+
   /* ================================================================ CSS == */
 
   var CSS = [
-    '.pz-xing{display:flex;flex-direction:column;gap:16px}',
-
-    '.pz-xing-water{display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,auto) minmax(0,1fr);gap:12px;align-items:stretch}',
-    '@media (max-width:820px){.pz-xing-water{grid-template-columns:1fr}}',
-
-    '.pz-xing-bank{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:12px;',
-    '  border:1px solid var(--line);background:linear-gradient(180deg,var(--panel-2),var(--panel));min-height:150px;',
-    '  transition:border-color .25s var(--ease),box-shadow .25s var(--ease)}',
-    '.pz-xing-bank.is-here{border-color:var(--acc);box-shadow:0 0 26px var(--acc-glow) inset}',
-    '.pz-xing-bank.is-risk{border-color:var(--bad)}',
-    '.pz-xing-bank__h{display:flex;justify-content:space-between;align-items:center;',
-    '  font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}',
-    '.pz-xing-bank__h b{color:var(--acc-2);letter-spacing:0;text-transform:none;font-size:12px}',
-    '.pz-xing-bank__list{display:flex;flex-wrap:wrap;gap:7px}',
-
     '.pz-xing-item{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:9px;',
     '  border:1px solid var(--line);background:var(--panel-3);color:var(--text);font-size:12px;cursor:pointer;',
     '  transition:transform .15s var(--ease),border-color .15s var(--ease),opacity .15s var(--ease)}',
@@ -335,8 +372,17 @@
     '.pz-xing-warn{font-size:12px;line-height:1.5;color:var(--bad);padding:8px 10px;border-radius:7px;',
     '  background:rgba(226,105,95,.08);border:1px solid rgba(226,105,95,.28)}',
 
-    '.pz-xing-go{animation:pzXingBob 3.2s var(--ease) infinite}',
-    '@keyframes pzXingBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}'
+    /* degraded mode only: the two banks as lists, when there is no arena */
+    '.pz-xing-water{display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,auto) minmax(0,1fr);gap:12px;align-items:stretch}',
+    '@media (max-width:820px){.pz-xing-water{grid-template-columns:1fr}}',
+    '.pz-xing-bank{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:12px;',
+    '  border:1px solid var(--line);background:linear-gradient(180deg,var(--panel-2),var(--panel));min-height:150px}',
+    '.pz-xing-bank.is-here{border-color:var(--acc);box-shadow:0 0 26px var(--acc-glow) inset}',
+    '.pz-xing-bank.is-risk{border-color:var(--bad)}',
+    '.pz-xing-bank__h{display:flex;justify-content:space-between;align-items:center;',
+    '  font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}',
+    '.pz-xing-bank__h b{color:var(--acc-2);letter-spacing:0;text-transform:none;font-size:12px}',
+    '.pz-xing-bank__list{display:flex;flex-wrap:wrap;gap:7px}'
   ].join('\n');
 
   /* ================================================================ MOUNT = */
@@ -347,14 +393,20 @@
     var h = PS.ui.h;
     var C = puzzle.content;
     var finished = false;
+    var arena = null;
+    var raft = null;                 // the carrier's station handle
+    var castBtn = null;              // the map-side "cast off"
+    var cargoProps = {};             // cargo key -> prop handle, for what is ashore
 
-    var nearBank = h('div', { class: 'pz-xing-bank' });
-    var farBank  = h('div', { class: 'pz-xing-bank' });
+    var shore = buildShore(puzzle);
+
     var boatBox  = h('div', { class: 'pz-xing-boat' });
     var rulesBox = h('div', { class: 'pz-xing-rules' });
     var countBox = h('div', { class: 'pz-xing-count' });
     var warnBox  = h('div', {});
     var actions  = h('div', { class: 'pz-row' });
+    var nearBank = h('div', { class: 'pz-xing-bank' });    // degraded mode only
+    var farBank  = h('div', { class: 'pz-xing-bank' });
 
     function isAbandoned(key) { return puzzle.abandoned.indexOf(key) >= 0; }
     function bitOf(key) { return 1 << puzzle.idx[key]; }
@@ -385,7 +437,112 @@
       return null;
     }
 
-    /* ------------------------------------------------------------- render */
+    function nameOf(key) {
+      for (var i = 0; i < puzzle.cargo.length; i++) if (puzzle.cargo[i].key === key) return puzzle.cargo[i].n;
+      return PS.state.prettify(key);
+    }
+
+    function cargoByKey(key) {
+      for (var i = 0; i < puzzle.cargo.length; i++) if (puzzle.cargo[i].key === key) return puzzle.cargo[i];
+      return null;
+    }
+
+    /* =========================================================== THE SHORE =
+       One invariant: a piece of cargo is either in your hands (loaded) or it
+       is standing on the bank it belongs to, with a prop under it. */
+
+    function slotFor(c) {
+      var i = puzzle.idx[c.key] % shore.nearSlots.length;
+      return onFarBank(c) ? shore.farSlots[i] : shore.nearSlots[i];
+    }
+
+    var shoreSig = null;
+
+    function syncShore() {
+      if (!arena) return;
+      // Only rebuild when the shore has actually changed: a repaint per chip
+      // click would otherwise pile up dead props for the frame loop to walk.
+      var sig = puzzle.mask + '|' + puzzle.side + '|' + puzzle.loaded + '|' + puzzle.abandoned.join(',');
+      if (sig === shoreSig) return;
+      shoreSig = sig;
+
+      var i, c, key;
+      for (key in cargoProps) {
+        if (cargoProps[key]) { cargoProps[key].remove(); delete cargoProps[key]; }
+      }
+      for (i = 0; i < puzzle.cargo.length; i++) {
+        c = puzzle.cargo[i];
+        if (isLoaded(c)) continue;                 // it is in your hands
+        var at = slotFor(c);
+        cargoProps[c.key] = makeCargoProp(c, at);
+      }
+    }
+
+    function makeCargoProp(c, at) {
+      if (isAbandoned(c.key)) {
+        return arena.prop({
+          x: at.x, y: at.y, icon: c.i, label: c.n,
+          hint: 'left behind',
+          trigger: 'press', once: false, glow: false, botSkip: true, tint: '#7d8593', emits: 0,
+          onActivate: function () { api.toast('The ' + c.n.toLowerCase() + ' stays where you left it.', null, 2200); }
+        });
+      }
+      return arena.prop({
+        x: at.x, y: at.y, icon: c.i, label: c.n,
+        hint: 'walk onto it to take it',
+        trigger: 'step', once: false, radius: 0.62, emits: 0.5,
+        onActivate: function () { pickUp(c); }
+      });
+    }
+
+    function pickUp(c) {
+      if (finished || puzzle.arrived) return;
+      if (isAbandoned(c.key) || isLoaded(c)) return;
+      if (onFarBank(c) !== !!puzzle.side) return;
+      var carrying = popcount(puzzle.loaded);
+      if (carrying >= puzzle.cap) {
+        api.toast(PS.state.prettify(C.carrier) + ' will not take any more.', 'bad', 1500);
+        if (arena) arena.shake(4, 0.22);
+        return;
+      }
+      puzzle.loaded |= bitOf(c.key);
+      api.toast('You pick up the ' + c.n.toLowerCase() + '.', null, 1600);
+      paintAll();
+      warnOnRisk();
+    }
+
+    function putDown(c) {
+      if (finished) return;
+      puzzle.loaded &= ~bitOf(c.key);
+      paintAll();
+      warnOnRisk();
+    }
+
+    /** Say out loud what you are about to leave alone together, on the map. */
+    var lastRisk = null;
+    function warnOnRisk() {
+      if (!arena || finished || puzzle.arrived) return;
+      var risk = previewConflict();
+      if (risk === lastRisk) return;
+      lastRisk = risk;
+      if (!risk) return;
+      pointAt(risk);
+      api.toast('Cast off like that and you leave it behind you: ' + risk.why, 'bad', 3600);
+    }
+
+    /** Ring the two things a rule is about, wherever they are standing. */
+    function pointAt(rule) {
+      if (!arena) return;
+      var keys = [rule.a, rule.b];
+      for (var i = 0; i < keys.length; i++) {
+        var c = cargoByKey(keys[i]);
+        if (!c || isLoaded(c)) continue;
+        var at = slotFor(c);
+        arena.ping(at.x, at.y, '#e2695f');
+      }
+    }
+
+    /* ============================================================== PANELS */
 
     function chip(c) {
       var loaded = isLoaded(c);
@@ -400,13 +557,14 @@
         h('span', { class: 'pz-xing-item__i', text: c.i }),
         h('span', { text: c.n })
       ]);
-      btn.addEventListener('click', function () { load(c); });
+      btn.addEventListener('click', function () { pickUp(c); });
       return btn;
     }
 
+    /** Degraded mode only: the two banks as lists. */
     function paintBanks() {
+      if (!nearBank.parentNode) return;
       var i, c;
-
       PS.ui.clear(nearBank);
       PS.ui.clear(farBank);
 
@@ -461,16 +619,17 @@
         (function (c) {
           var b = h('button', { type: 'button', class: 'pz-xing-item is-loaded', disabled: finished }, [
             h('span', { class: 'pz-xing-item__i', text: c.i }),
-            h('span', { text: c.n })
+            h('span', { text: c.n }),
+            h('span', { text: '\u2193' })
           ]);
-          b.addEventListener('click', function () { unload(c); });
+          b.addEventListener('click', function () { putDown(c); });
           hold.appendChild(b);
         })(puzzle.cargo[i]);
       }
       if (!carried) hold.appendChild(h('span', { class: 'pz-note', text: 'empty' }));
 
       PS.ui.append(boatBox, [
-        h('div', { class: 'pz-xing-boat__i' + (finished ? '' : ' pz-xing-go'), text: C.carrierIcon }),
+        h('div', { class: 'pz-xing-boat__i', text: C.carrierIcon }),
         h('div', { class: 'pz-xing-boat__s', text: PS.state.prettify(C.carrier) }),
         h('div', { class: 'pz-xing-boat__s', text: puzzle.side ? 'tied up at ' + C.far.toLowerCase() : 'tied up at ' + C.near.toLowerCase() }),
         hold,
@@ -494,11 +653,6 @@
       }
     }
 
-    function nameOf(key) {
-      for (var i = 0; i < puzzle.cargo.length; i++) if (puzzle.cargo[i].key === key) return puzzle.cargo[i].n;
-      return PS.state.prettify(key);
-    }
-
     function paintCount() {
       PS.ui.clear(countBox);
       var over = puzzle.trips > puzzle.optimal;
@@ -518,25 +672,39 @@
       }
     }
 
-    function paintAll() { paintBanks(); paintBoat(); paintRules(); paintCount(); paintActions(); }
+    function paintHud() {
+      if (!arena || finished) return;
+      var across = 0, waiting = 0, i;
+      for (i = 0; i < puzzle.cargo.length; i++) {
+        var c = puzzle.cargo[i];
+        if (isAbandoned(c.key)) continue;
+        if (onFarBank(c) && !isLoaded(c)) across++; else waiting++;
+      }
+      cTrips.set(puzzle.trips + ' / ' + puzzle.optimal + ' best', puzzle.trips > puzzle.optimal ? 'warn' : null);
+      cHold.set(popcount(puzzle.loaded) + ' / ' + puzzle.cap, popcount(puzzle.loaded) >= puzzle.cap ? 'warn' : null);
+      cAcross.set(across + ' over, ' + waiting + ' to go');
+      var risk = previewConflict();
+      cRisk.set(risk ? nameOf(risk.a) + ' \u2715 ' + nameOf(risk.b) : 'clear', risk ? 'bad' : null);
+    }
+
+    /** Are you actually standing on the carrier? */
+    function atDock() {
+      if (!arena) return false;
+      var p = arena.player();
+      var d = puzzle.side ? shore.farDock : shore.nearDock;
+      return Math.abs(p.tx - d.x) + Math.abs(p.ty - d.y) <= 1;
+    }
+
+    /* Casting off is the thing you came here to do, so it lives on the map as
+       well as in the panel — greyed out until you are stood in the carrier. */
+    function refreshFoot() {
+      if (!castBtn) return;
+      castBtn.disabled = finished || puzzle.arrived || !atDock();
+    }
+
+    function paintAll() { paintBanks(); paintBoat(); paintRules(); paintCount(); paintActions(); paintHud(); refreshFoot(); syncShore(); }
 
     /* ------------------------------------------------------------ actions */
-
-    function load(c) {
-      if (finished || puzzle.arrived) return;
-      if (isAbandoned(c.key)) return;
-      if (onFarBank(c) !== !!puzzle.side) return;
-      var carried = popcount(puzzle.loaded);
-      if (carried >= puzzle.cap) { api.toast(PS.state.prettify(C.carrier) + ' will not take any more.', 'bad', 1500); return; }
-      puzzle.loaded |= bitOf(c.key);
-      paintAll();
-    }
-
-    function unload(c) {
-      if (finished) return;
-      puzzle.loaded &= ~bitOf(c.key);
-      paintAll();
-    }
 
     function cast() {
       if (finished || puzzle.arrived) return;
@@ -544,6 +712,7 @@
       if (risk) {
         puzzle.refused++;
         api.toast(risk.why, 'bad', 3200);
+        if (arena) { arena.hit('#e2695f'); pointAt(risk); }
         return;
       }
       puzzle.mask = puzzle.side ? (puzzle.mask & ~puzzle.loaded) : (puzzle.mask | puzzle.loaded);
@@ -551,6 +720,15 @@
       puzzle.loaded = 0;
       puzzle.trips++;
       api.tweak({ energy: -1 });
+      lastRisk = null;
+
+      if (arena) {
+        var dock = puzzle.side ? shore.farDock : shore.nearDock;
+        raft.move(dock.x, dock.y);
+        arena.teleport(dock.x, dock.y);
+        arena.ping(dock.x, dock.y);
+        arena.dust(dock.x, dock.y, 9);
+      }
       paintAll();
       checkDone();
     }
@@ -583,6 +761,7 @@
       puzzle.loaded &= ~bitOf(c.key);
       api.tweak({ morale: -4 });
       api.toast('You leave the ' + c.n.toLowerCase() + ' where it stands.', 'bad');
+      lastRisk = null;
       paintAll();
       checkDone();
     }
@@ -615,14 +794,18 @@
           title: risk ? risk.why : 'Cross with what is loaded'
         }, [C.carrierIcon + ' ' + C.cast]),
         h('button', { class: 'pz-btn pz-btn--sm', type: 'button', onclick: abandonSelected }, ['\u2716 Leave something']),
-        h('button', { class: 'pz-btn pz-btn--sm pz-btn--danger', type: 'button', onclick: giveUp }, ['\u21A9 Go round the long way'])
+        // With an arena this lives in the foot, where turning back belongs.
+        arena ? null : h('button', {
+          class: 'pz-btn pz-btn--sm pz-btn--danger', type: 'button', onclick: giveUp
+        }, ['\u21A9 Go round the long way'])
       ]);
     }
 
     /* ----------------------------------------------------------- the exit */
 
     function renderArrival() {
-      paintBanks(); paintBoat(); paintRules(); paintCount();
+      paintBanks(); paintBoat(); paintRules(); paintCount(); paintHud(); refreshFoot(); syncShore();
+      if (raft) { raft.solve(); raft.openNow(); }
       PS.ui.clear(actions);
       var over = puzzle.trips - puzzle.optimal;
       PS.ui.append(actions, [
@@ -702,25 +885,96 @@
       });
     }
 
-    /* ------------------------------------------------------------- layout */
+    /** The carrier's own panel: the hold, the rules, the count, the controls. */
+    function raftPanel(host) {
+      PS.ui.append(host, [
+        boatBox,
+        warnBox,
+        actions,
+        h('div', { class: 'pz-card' }, [
+          h('div', { class: 'pz-card__head', text: 'What cannot be left alone' }),
+          rulesBox
+        ]),
+        countBox
+      ]);
+    }
 
-    PS.ui.append(el, h('div', { class: 'pz-xing' }, [
-      h('div', { class: 'pz-note' }, [
-        PS.state.prettify(C.carrier) + ' takes you and ',
-        h('strong', { text: puzzle.cap === 1 ? 'one thing' : puzzle.cap + ' things' }),
-        '. Whatever you are not standing beside is on its own \u2014 and some of it cannot be trusted together.'
-      ]),
-      h('div', { class: 'pz-xing-water' }, [nearBank, boatBox, farBank]),
-      warnBox,
-      h('div', { class: 'pz-card' }, [
-        h('div', { class: 'pz-card__head', text: 'What cannot be left alone' }),
-        rulesBox
-      ]),
-      countBox,
-      actions
-    ]));
+    /* ------------------------------------------------------- degraded mode --
+       arena.js is core and always present in index.html, but never let a
+       missing layer strand the player on the wrong bank.                    */
+
+    if (!PS.arena || typeof PS.arena.create !== 'function') return renderFlat();
+
+    /* ============================================================== ARENA = */
+
+    var host = h('div', {});
+    PS.ui.append(el, host);
+
+    arena = PS.arena.create(host, {
+      map: { w: shore.w, h: shore.h, tiles: shore.tiles },
+      spawn: shore.spawn,
+      light: state.stats.light,
+      avatar: '\uD83E\uDDCD',
+      onStep: function () { refreshFoot(); }
+    });
+    if (!arena) return renderFlat();
+    teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
+
+    var cTrips = arena.chip('Trips', '\uD83D\uDC63');
+    var cHold = arena.chip(PS.state.prettify(C.carrier), C.carrierIcon);
+    var cAcross = arena.chip('Cargo', '\uD83D\uDCE6');
+    var cRisk = arena.chip('Unwatched', '\u26A0\uFE0F');
+
+    arena.note('Walk onto a thing to pick it up, then walk to ' + C.carrier + '. What you are not standing beside is on its own.');
+    castBtn = arena.button(C.carrierIcon + ' ' + C.cast, cast, 'pz-btn--primary');
+    arena.button('\u21A9 Go round the long way', giveUp, 'pz-btn--danger');
+
+    raft = arena.station({
+      x: shore.nearDock.x, y: shore.nearDock.y,
+      icon: C.carrierIcon, label: PS.state.prettify(C.carrier),
+      hint: 'load it and cross',
+      radius: 1.4, emits: 2.3,
+      onEnter: function (panelEl) { raftPanel(panelEl); }
+    });
+
+    /* The channel is a wall as far as walking is concerned, so give it a face:
+       scenery in the middle of it, out of reach and out of the bot's way, so
+       the gap reads as water rather than as the edge of the map. */
+    for (var wy = 2; wy < shore.h - 2; wy += 3) {
+      arena.prop({
+        x: WATER_X0 + 1, y: wy,
+        icon: C.gapIcon || '\uD83C\uDF0A', label: PS.state.prettify(C.gap || 'the water'),
+        hint: 'nothing walks that', trigger: 'press', once: false,
+        glow: false, botSkip: true, emits: 0.4,
+        onActivate: function () { }
+      });
+    }
 
     paintAll();
+    arena.focus();
+
+    /* ------------------------------------------------------------ flat UI --
+       No canvas layer: the crossing becomes the two lists it used to be, so
+       everything can still be got across.                                   */
+
+    function renderFlat() {
+      PS.ui.append(el, h('div', { class: 'pz-col' }, [
+        h('div', { class: 'pz-note' }, [
+          PS.state.prettify(C.carrier) + ' takes you and ',
+          h('strong', { text: puzzle.cap === 1 ? 'one thing' : puzzle.cap + ' things' }),
+          '. Whatever you are not standing beside is on its own \u2014 and some of it cannot be trusted together.'
+        ]),
+        h('div', { class: 'pz-xing-water' }, [nearBank, boatBox, farBank]),
+        warnBox,
+        h('div', { class: 'pz-card' }, [
+          h('div', { class: 'pz-card__head', text: 'What cannot be left alone' }),
+          rulesBox
+        ]),
+        countBox,
+        actions
+      ]));
+      paintAll();
+    }
   }
 
   function unmount() {
