@@ -457,6 +457,12 @@
     }
 
     var shoreSig = null;
+    var shoreDirty = true;
+
+    /* Rebuilding props is deferred to the next frame on purpose: this gets
+       called from inside a step trigger, and adding to the arena's thing list
+       while the arena is walking it is asking for trouble. */
+    function markShore() { shoreDirty = true; }
 
     function syncShore() {
       if (!arena) return;
@@ -702,7 +708,7 @@
       castBtn.disabled = finished || puzzle.arrived || !atDock();
     }
 
-    function paintAll() { paintBanks(); paintBoat(); paintRules(); paintCount(); paintActions(); paintHud(); refreshFoot(); syncShore(); }
+    function paintAll() { paintBanks(); paintBoat(); paintRules(); paintCount(); paintActions(); paintHud(); refreshFoot(); markShore(); }
 
     /* ------------------------------------------------------------ actions */
 
@@ -804,7 +810,7 @@
     /* ----------------------------------------------------------- the exit */
 
     function renderArrival() {
-      paintBanks(); paintBoat(); paintRules(); paintCount(); paintHud(); refreshFoot(); syncShore();
+      paintBanks(); paintBoat(); paintRules(); paintCount(); paintHud(); refreshFoot(); markShore();
       if (raft) { raft.solve(); raft.openNow(); }
       PS.ui.clear(actions);
       var over = puzzle.trips - puzzle.optimal;
@@ -915,7 +921,8 @@
       spawn: shore.spawn,
       light: state.stats.light,
       avatar: '\uD83E\uDDCD',
-      onStep: function () { refreshFoot(); }
+      onStep: function () { refreshFoot(); },
+      onTick: function () { if (shoreDirty) { shoreDirty = false; syncShore(); } }
     });
     if (!arena) return renderFlat();
     teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
