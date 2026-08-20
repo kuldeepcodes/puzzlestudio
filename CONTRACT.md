@@ -732,6 +732,16 @@ like a measurement of the thing. That is the same *degrade honestly* rule applie
 documentation rather than to code: the corrected row claims what reproduces and
 declines to claim what doesn't.
 
+What does reproduce, across every independent attempt, is the **shape**: the impact
+scales with how often the player steps on ground that was not *proven* safe when they
+stepped there. Sweeping exactly that parameter and holding everything else fixed gives
+a monotonic curve. It is smallest for a disciplined deducer — who barely needs the
+classifier — and largest for one who guesses or slides a tile past the intended target,
+which is precisely the player the misread/overshoot split exists to judge. **The defect
+was concentrated in the population the feature is for, and absent in the one it isn't.**
+That is why no single percentage could have been honest without also naming the player
+it was measured on.
+
 And the last row is worth reading twice, because it is the general case of the other
 five. A marker is a **proxy** for the property you care about, and a proxy drifts from
 its property the moment anyone writes about it — the grep asked "does this string appear
