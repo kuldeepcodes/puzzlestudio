@@ -358,6 +358,7 @@
       fallback: fallback,
       steps: 0,
       hits: 0,
+      misreads: 0,                 // hits the player had the information to avoid
       damage: 9 + Math.round(t * 2.4),
       done: false,
       tier: t,
@@ -470,10 +471,14 @@
           .concat(puzzle.hits >= 3 ? ['went_through_the_floor'] : [])
           .concat(choice === 'scavenge' ? ['left_a_marked_lane'] : []),
         signals: {
-          logic: clean ? 3 : (puzzle.hits <= 2 ? 2 : 1),
+          // logic and brute read MISREADS, not raw falls: stepping somewhere
+          // you had already proven dangerous is a reasoning failure, whereas
+          // overshooting into an unknown cell is a steering one. Outcome,
+          // health and morale still read `hits` — a fall is a fall either way.
+          logic: clean ? 3 : (puzzle.misreads === 0 ? 2 : (puzzle.misreads <= 2 ? 1 : 0)),
           caution: clean && readALot ? 3 : (clean ? 2 : 1),
           speed: efficient && clean ? 2 : 0,
-          brute: puzzle.hits >= 3 ? 2 : 0,
+          brute: puzzle.misreads >= 3 ? 2 : 0,
           scavenge: choice === 'scavenge' ? 1 : 0
         },
         choice: choice,
@@ -650,6 +655,20 @@
       puzzle.at = i;
 
       if (puzzle.hazard[i] && !puzzle.triggered[i] && !puzzle.done) {
+        // Was this one avoidable? Run the same deduction the player could have
+        // run from what they had already uncovered. If the cell was provably a
+        // hazard, they had the information and stepped anyway — that is a
+        // misread. If it was not provable, they either gambled or, under free
+        // movement, simply slid a tile further than they meant to.
+        //
+        // The distinction matters because `logic` feeds the Director's
+        // playstyle profile. Scoring raw falls would let a player with clumsy
+        // steering be profiled as a poor reasoner and steered toward physical
+        // scenarios, which is precisely backwards.
+        var provSafe = {}, provHaz = {};
+        propagate(puzzle.n8, puzzle.near, puzzle.revealed, provSafe, provHaz);
+        if (provHaz[i]) puzzle.misreads++;
+
         // Never fatal — expensive. You go through, and you climb back out.
         puzzle.triggered[i] = true;
         puzzle.hits++;
