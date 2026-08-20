@@ -43,6 +43,15 @@
    THE BRANCH
      You now know who has been stealing and exactly how much. Say so, or say
      nothing and take the same cut yourself.
+
+   THE STORE (arena)
+     The totals are not printed on the ledger. They are what is physically on
+     the shelves and in the bins, so each one is a thing in the room you have
+     to walk over and count: one shelf gives you one line total, one bin gives
+     you one cage total, and until you have been to it the ledger just shows a
+     question mark. Finding the totals is the audit. The desk in the corner is
+     a station, and the grid you fill in there is exactly the grid it always
+     was.
    ========================================================================== */
 (function (root) {
   'use strict';
@@ -58,6 +67,8 @@
       rows: ['Flour', 'Salt', 'Paraffin', 'Tinned meat', 'Dried milk', 'Sugar', 'Tea'],
       cols: ['Cage A', 'Cage B', 'Cage C', 'Cage D', 'Cage E'],
       ledger: 'ration book', keeper: 'the quartermaster',
+      rowIcon: '\uD83E\uDDFA', colIcon: '\uD83D\uDDC4\uFE0F', deskIcon: '\uD83D\uDCD2',
+      rowThing: 'shelves', colThing: 'cages',
       opening: 'Somebody has been eating better than everybody else.',
       solvedLine: 'The count closes. Every line balances except one.',
       failLine: 'The columns will not sit down. You are counting the same tins twice.',
@@ -71,6 +82,8 @@
       rows: ['Detonator caps', 'Copper wire', 'Cell packs', 'Fuse cord', 'Pressure seals', 'Bolt sets', 'Filters'],
       cols: ['Crate 1', 'Crate 2', 'Crate 3', 'Crate 4', 'Crate 5'],
       ledger: 'shipping manifest', keeper: 'the loadmaster',
+      rowIcon: '\uD83E\uDDF0', colIcon: '\uD83D\uDCE6', deskIcon: '\uD83D\uDCCB',
+      rowThing: 'pallets', colThing: 'crates',
       opening: 'This load was signed for twice and it did not weigh the same either time.',
       solvedLine: 'The manifest reconciles. One line does not.',
       failLine: 'The crate totals refuse to agree. Something is counted in two places.',
@@ -84,6 +97,8 @@
       rows: ['Barley', 'Rye', 'Field bean', 'Squash', 'Flax', 'Turnip', 'Clover'],
       cols: ['Bin I', 'Bin II', 'Bin III', 'Bin IV', 'Bin V'],
       ledger: 'sowing book', keeper: 'the seed warden',
+      rowIcon: '\uD83C\uDF3E', colIcon: '\uD83E\uDEA3', deskIcon: '\uD83D\uDCD3',
+      rowThing: 'sacks', colThing: 'bins',
       opening: 'Next spring is written down in this room, and the sums are wrong.',
       solvedLine: 'The bins reconcile. One crop does not.',
       failLine: 'The rows will not close. You have double-counted a bin.',
@@ -444,10 +459,15 @@
   var CSS = [
     '.pz-ledger{display:grid;grid-template-columns:minmax(0,1fr) minmax(224px,278px);gap:18px;align-items:start}',
     '@media (max-width:880px){.pz-ledger{grid-template-columns:1fr}}',
+    '.pz-ledger.is-panel{display:flex;flex-direction:column;gap:12px}',
+    '.pz-ledger-stage{display:flex;flex-direction:column;gap:14px}',
 
     '.pz-ledger-sheet{display:grid;gap:4px;padding:13px;border-radius:12px;',
     '  background:linear-gradient(160deg,#0b0e14,#07090d);border:1px solid var(--line);',
     '  box-shadow:var(--sh-1);width:100%;max-width:520px;margin:0 auto;overflow-x:auto}',
+    '.pz-ledger.is-panel .pz-ledger-sheet{padding:8px;gap:3px}',
+    '.pz-ledger.is-panel .pz-ledger-cell{min-width:30px;font-size:14px}',
+    '.pz-ledger.is-panel .pz-ledger-key{min-width:30px;padding:7px 0;font-size:13px}',
 
     '.pz-ledger-corner{display:grid;place-items:center;font-family:var(--font-mono);font-size:10px;',
     '  color:var(--dimmer);letter-spacing:.08em}',
@@ -460,6 +480,8 @@
     '.pz-ledger-head.is-ok .pz-ledger-head__t b{color:var(--good)}',
     '.pz-ledger-head.is-over .pz-ledger-head__t b{color:var(--bad)}',
     '.pz-ledger-head.is-under .pz-ledger-head__t b{color:var(--warn)}',
+    '.pz-ledger-head.is-uncounted{opacity:.55}',
+    '.pz-ledger-head.is-uncounted .pz-ledger-head__t b{color:var(--dimmer)}',
 
     '.pz-ledger-cell{position:relative;aspect-ratio:1/1;min-width:38px;padding:0;border-radius:6px;',
     '  display:grid;place-items:center;font-family:var(--font-mono);font-size:clamp(13px,2.6vw,20px);',
@@ -513,14 +535,25 @@
     var k = puzzle.k;
     var finished = false;
     var sel = null;
+    var arena = null;
 
     var cellEls = grid2d(k, null);
     var rowHeads = [], colHeads = [];
+    var rowKnown = [], colKnown = [];
+    var rowHandles = [], colHandles = [];
+    var cCounted = null, cLeft = null;
+    var r00, c00;
+    for (r00 = 0; r00 < k; r00++) { rowKnown.push(false); colKnown.push(false); }
+
+    var stage = h('div', { class: 'pz-ledger-stage' });
+    var mapHost = h('div', {});
+    var endBox = h('div', {});
+    var panelRoot = h('div', { class: 'pz-ledger' });
 
     var sheet = h('div', {
       class: 'pz-ledger-sheet',
       style: {
-        gridTemplateColumns: 'minmax(76px,1.35fr) repeat(' + k + ',minmax(38px,1fr))',
+        gridTemplateColumns: 'minmax(76px,1.35fr) repeat(' + k + ',minmax(30px,1fr))',
         gridTemplateRows: 'auto repeat(' + k + ',auto)'
       }
     });
@@ -576,9 +609,18 @@
     var actions = h('div', { class: 'pz-col' });
     var keyBtns = [];
 
+    function countedTotals() {
+      var c = 0, i;
+      for (i = 0; i < k; i++) { if (rowKnown[i]) c++; if (colKnown[i]) c++; }
+      return c;
+    }
+
+    function allCounted() { return countedTotals() >= k * 2; }
+
     /* ------------------------------------------------------------- render -- */
 
-    function lineState(cur, target, full) {
+    function lineState(cur, target, full, known) {
+      if (!known) return 'is-uncounted';
       if (!full) return cur > target ? 'is-over' : '';
       return cur === target ? 'is-ok' : (cur > target ? 'is-over' : 'is-under');
     }
@@ -617,23 +659,27 @@
       for (r = 0; r < k; r++) {
         var rs = 0, rfull = true;
         for (c = 0; c < k; c++) { if (puzzle.grid[r][c]) rs += puzzle.grid[r][c]; else rfull = false; }
-        rowHeads[r].className = 'pz-ledger-head pz-ledger-head--row ' + lineState(rs, puzzle.rowT[r], rfull);
-        setTotal(rowHeads[r], rs, puzzle.rowT[r]);
+        rowHeads[r].className = 'pz-ledger-head pz-ledger-head--row ' + lineState(rs, puzzle.rowT[r], rfull, rowKnown[r]);
+        setTotal(rowHeads[r], rs, puzzle.rowT[r], rowKnown[r]);
       }
       for (c = 0; c < k; c++) {
         var cs = 0, cfull = true;
         for (r = 0; r < k; r++) { if (puzzle.grid[r][c]) cs += puzzle.grid[r][c]; else cfull = false; }
-        colHeads[c].className = 'pz-ledger-head ' + lineState(cs, puzzle.colT[c], cfull);
-        setTotal(colHeads[c], cs, puzzle.colT[c]);
+        colHeads[c].className = 'pz-ledger-head ' + lineState(cs, puzzle.colT[c], cfull, colKnown[c]);
+        setTotal(colHeads[c], cs, puzzle.colT[c], colKnown[c]);
       }
 
       paintKeys();
       paintRead(f);
     }
 
-    function setTotal(head, cur, target) {
+    function setTotal(head, cur, target, known) {
       var box = head.lastChild;
       PS.ui.clear(box);
+      if (!known) {
+        PS.ui.append(box, [h('b', { text: String(cur) }), ' / ?']);
+        return;
+      }
       var diff = cur - target;
       PS.ui.append(box, [
         h('b', { text: String(cur) }),
@@ -645,7 +691,7 @@
       for (var d = 1; d <= puzzle.V; d++) {
         var btn = keyBtns[d - 1];
         var spent = false;
-        if (sel) {
+        if (sel && allCounted()) {
           var cand = candidates(puzzle, sel[0], sel[1]);
           spent = cand.indexOf(d) < 0;
         }
@@ -662,13 +708,24 @@
 
       PS.ui.clear(readBox);
       PS.ui.append(readBox, [
+        row('Totals counted', countedTotals() + ' / ' + (k * 2), allCounted() ? 'is-ok' : ''),
         row('Entries left', String(blanksLeft), blanksLeft === 0 ? 'is-ok' : ''),
         row('Lines in dispute', String(f.length), f.length ? 'is-bad' : 'is-ok'),
         row('Recounts', String(puzzle.checks), '')
       ]);
 
+      if (cCounted) cCounted.set(countedTotals() + ' / ' + (k * 2), allCounted() ? null : 'warn');
+      if (cLeft) cLeft.set(String(blanksLeft));
+
       PS.ui.clear(noteBox);
-      if (sel && !puzzle.given[sel[0]][sel[1]]) {
+      if (!allCounted()) {
+        noteBox.appendChild(h('div', { class: 'pz-ledger-note' }, [
+          'The book cannot check itself. ',
+          h('b', { text: String(k * 2 - countedTotals()) }),
+          ' more totals are out there on the ' + (C.rowThing || 'shelves') + ' and in the ' +
+          (C.colThing || 'bins') + ', and until you have counted them this sheet is guesswork.'
+        ]));
+      } else if (sel && !puzzle.given[sel[0]][sel[1]]) {
         var cand = candidates(puzzle, sel[0], sel[1]);
         noteBox.appendChild(h('div', { class: 'pz-ledger-note' }, [
           puzzle.rowLabels[sel[0]] + ' in ' + puzzle.colLabels[sel[1]] + ' \u2014 ',
@@ -680,6 +737,105 @@
       function row(a, b, cls) {
         return h('div', { class: 'pz-ledger-read__row ' + (cls || '') },
           [h('span', { text: a }), h('b', { text: b })]);
+      }
+    }
+
+    /* -------------------------------------------------------------- store -- */
+    /* Every total on the sheet is a thing standing in this room. The lines are
+       shelves down the west wall; the cages are along the north. Counting one
+       is walking to it.                                                      */
+
+    function storeMap() {
+      var w = 6 + k * 3, hgt = 4 + k * 2;
+      var tiles = [], x, y;
+      for (y = 0; y < hgt; y++) {
+        var line = [];
+        for (x = 0; x < w; x++) line.push((y === 0 || y === hgt - 1 || x === 0 || x === w - 1) ? 1 : 0);
+        tiles.push(line);
+      }
+      var mid = Math.floor(hgt / 2);
+      for (x = 4; x <= 6 && x < w - 1; x++) tiles[mid][x] = 1;
+      for (x = w - 7; x <= w - 5; x++) if (x > 1) tiles[mid][x] = 1;
+
+      var rowSpots = [], colSpots = [], i;
+      for (i = 0; i < k; i++) rowSpots.push({ x: 1, y: 3 + i * 2 });
+      for (i = 0; i < k; i++) colSpots.push({ x: 5 + i * 3, y: 1 });
+      return {
+        w: w, h: hgt, tiles: tiles,
+        rowSpots: rowSpots, colSpots: colSpots,
+        desk: { x: w - 2, y: hgt - 2 }, spawn: { x: w - 4, y: hgt - 2 }
+      };
+    }
+
+    function buildStore() {
+      if (!PS.arena || typeof PS.arena.create !== 'function') return false;
+
+      var m = storeMap();
+      arena = PS.arena.create(mapHost, {
+        map: { w: m.w, h: m.h, tiles: m.tiles },
+        spawn: m.spawn,
+        avatar: '\uD83E\uDDCD',
+        light: state.stats.light,
+        lightCurve: function (v) { return 4.4 + Math.min(100, Math.max(0, v)) / 100 * 3; },
+        darkness: 0.58,
+        memory: 0.68
+      });
+      if (!arena) return false;
+      teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
+
+      cCounted = arena.chip('Counted', '\uD83D\uDD22');
+      cLeft = arena.chip('Blanks', '\u270F\uFE0F');
+
+      var i;
+      for (i = 0; i < k; i++) {
+        (function (idx) {
+          rowHandles.push(arena.prop({
+            x: m.rowSpots[idx].x, y: m.rowSpots[idx].y,
+            icon: C.rowIcon || '\uD83E\uDDFA', label: puzzle.rowLabels[idx],
+            hint: 'count it', trigger: 'proximity', radius: 1.15, once: false, emits: 0.7,
+            onActivate: function () { countRow(idx); }
+          }));
+        })(i);
+      }
+      for (i = 0; i < k; i++) {
+        (function (idx) {
+          colHandles.push(arena.prop({
+            x: m.colSpots[idx].x, y: m.colSpots[idx].y,
+            icon: C.colIcon || '\uD83D\uDDC4\uFE0F', label: puzzle.colLabels[idx],
+            hint: 'count it', trigger: 'proximity', radius: 1.15, once: false, emits: 0.7,
+            onActivate: function () { countCol(idx); }
+          }));
+        })(i);
+      }
+
+      arena.station({
+        x: m.desk.x, y: m.desk.y, icon: C.deskIcon || '\uD83D\uDCD2', label: 'The ' + C.ledger,
+        hint: 'work the sheet', radius: 1.4, emits: 1.9,
+        onEnter: function (panelEl) { PS.ui.append(panelEl, panelRoot); }
+      });
+
+      arena.note('Count the ' + (C.rowThing || 'shelves') + ' and the ' + (C.colThing || 'bins') +
+        ' first \u2014 the totals are on them, not in the book. Then work the sheet at the desk.');
+      return true;
+    }
+
+    function countRow(i) {
+      if (finished) return;
+      if (!rowKnown[i]) {
+        rowKnown[i] = true;
+        api.toast(puzzle.rowLabels[i] + ': ' + puzzle.rowT[i] + ' ' + C.unit + ' across the whole line.', 'info', 3200);
+        if (rowHandles[i]) rowHandles[i].setLabel(puzzle.rowLabels[i] + ' \u2014 ' + puzzle.rowT[i]);
+        paint();
+      }
+    }
+
+    function countCol(i) {
+      if (finished) return;
+      if (!colKnown[i]) {
+        colKnown[i] = true;
+        api.toast(puzzle.colLabels[i] + ': ' + puzzle.colT[i] + ' ' + C.unit + ' in it, counted twice.', 'info', 3200);
+        if (colHandles[i]) colHandles[i].setLabel(puzzle.colLabels[i] + ' \u2014 ' + puzzle.colT[i]);
+        paint();
       }
     }
 
@@ -703,15 +859,18 @@
     function onKey(ev) {
       if (finished) return;
       if (!sel) return;
+      if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
       if (ev.key === 'Backspace' || ev.key === 'Delete' || ev.key === '0') { ev.preventDefault(); write(0); return; }
       var n = parseInt(ev.key, 10);
       if (n >= 1 && n <= puzzle.V) { ev.preventDefault(); write(n); return; }
+      // Arrow keys belong to the avatar while there is a room to walk around.
+      if (arena) return;
       var move = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[ev.key];
       if (!move) return;
       ev.preventDefault();
-      var r = Math.max(0, Math.min(k - 1, sel[0] + move[0]));
-      var c = Math.max(0, Math.min(k - 1, sel[1] + move[1]));
-      pick(r, c);
+      var rr = Math.max(0, Math.min(k - 1, sel[0] + move[0]));
+      var cc = Math.max(0, Math.min(k - 1, sel[1] + move[1]));
+      pick(rr, cc);
     }
     document.addEventListener('keydown', onKey);
     teardownFns.push(function () { document.removeEventListener('keydown', onKey); });
@@ -759,9 +918,13 @@
     }
 
     function renderReveal() {
-      PS.ui.clear(actions);
       var name = puzzle.rowLabels[puzzle.shortRow].toLowerCase();
-      PS.ui.append(actions, [
+      if (arena) {
+        arena.closePanel();
+        arena.note(C.solvedLine);
+      }
+      PS.ui.clear(endBox);
+      PS.ui.append(endBox, [
         h('div', { class: 'pz-ledger-reveal' }, [
           C.revealLead,
           h('b', { text: puzzle.shortBy + ' ' + C.unit + ' of ' + name }),
@@ -845,7 +1008,7 @@
       ])
     ]);
 
-    PS.ui.append(el, h('div', { class: 'pz-ledger' }, [
+    PS.ui.append(panelRoot, [
       h('div', { class: 'pz-col' }, [
         sheet,
         h('div', { class: 'pz-note' }, [
@@ -859,16 +1022,27 @@
         h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'The count' }), readBox]),
         h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'Sign' }), actions])
       ])
-    ]));
+    ]);
+
+    PS.ui.append(stage, [mapHost, endBox]);
+    PS.ui.append(el, stage);
+
+    if (buildStore()) {
+      panelRoot.className = 'pz-ledger is-panel';
+    } else {
+      // No arena layer: the totals are simply printed, as they always were.
+      for (var q = 0; q < k; q++) { rowKnown[q] = true; colKnown[q] = true; }
+      PS.ui.append(mapHost, panelRoot);
+    }
 
     pick(firstBlank()[0], firstBlank()[1]);
+    if (arena) arena.focus();
 
     function firstBlank() {
       for (var r = 0; r < k; r++) for (var c = 0; c < k; c++) if (!puzzle.given[r][c]) return [r, c];
       return [0, 0];
     }
   }
-
   function unmount() {
     while (teardownFns.length) {
       try { teardownFns.pop()(); } catch (e) { /* keep unwinding */ }
