@@ -379,10 +379,14 @@
         y: (spec.y || 0) + 0.5,
         tx: spec.x | 0,
         ty: spec.y | 0,
-        icon: spec.icon || (kind === 'station' ? '\uD83D\uDCDF' : '\u2B50'),
+        // `!== undefined`, not `||`: an engine that wants an invisible prop
+        // passes icon:'' and a decorative one passes radius:0. With `||` both
+        // silently became the default (a star, and a 0.62 tile catch radius
+        // that pops an empty prompt at anyone standing on it).
+        icon: spec.icon !== undefined ? spec.icon : (kind === 'station' ? '\uD83D\uDCDF' : '\u2B50'),
         label: spec.label || '',
         hint: spec.hint || (kind === 'station' ? 'Walk up to use' : 'Take it'),
-        radius: spec.radius || (kind === 'station' ? 1.35 : 0.62),
+        radius: typeof spec.radius === 'number' ? spec.radius : (kind === 'station' ? 1.35 : 0.62),
         trigger: spec.trigger || (kind === 'station' ? 'proximity' : 'step'),
         tint: spec.tint || null,
         glow: spec.glow === undefined ? true : !!spec.glow,
@@ -1070,6 +1074,10 @@
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.globalAlpha = t.solved ? 0.55 : 1;
+        // Colour emoji ignore fillStyle, but plain glyphs do not — and without
+        // this they inherited whatever fill ran last, so a prop labelled with
+        // a digit or a letter came out near-black and effectively invisible.
+        ctx.fillStyle = t.tint || rgba(pal.ink, 1);
         ctx.fillText(t.icon, sx, sy - (t.kind === 'station' ? tile * 0.05 : 0) + Math.sin(clock * 1.7 + t.ty) * 1.2);
         ctx.globalAlpha = 1;
 
