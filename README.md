@@ -67,9 +67,24 @@ You do not choose an option from a list; you walk up to the thing. A console onl
 opens its panel once you are standing at it, and closes when you walk away —
 with everything you had half-typed into it still there when you come back.
 
-`grid_crawl` is the reference conversion: a dark maze you actually crawl, where
-the fuel caches are objects you have to find and walk onto, and the way out is a
-place you have to reach.
+**All twenty scenarios are played this way.** What walking *means* changes with the
+scenario, which is the point:
+
+- **The Dark Tunnel** is a maze you actually crawl, where the fuel caches are objects
+  you have to find and walk onto and the way out is a place you have to reach.
+- **Night Watch** is real-time stealth. The watchmen pace visible cones, walls block
+  their line of sight, and you cross the yard for real by reading the pattern and
+  moving through the gaps.
+- **The Unstable Floor** makes you commit a deduction with your feet — each safe board
+  prints its count where you are standing, and the soft ones are found the hard way.
+- **Storm Shelter Rations** puts the survivors in the room with you. Some only tell you
+  the truth if you actually go over to them, so hurrying means allocating blind.
+- **Restricted Access** scatters the clues across an office and keeps the deduction grid
+  on a terminal — because finding evidence belongs in the world, and a logic grid
+  genuinely is better as a grid.
+
+That last one is the rule the conversions follow: **the world is for gathering, the
+panel is for reasoning.** Nothing was forced into the map just to make it move.
 
 ---
 
