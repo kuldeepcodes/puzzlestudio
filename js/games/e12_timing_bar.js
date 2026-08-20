@@ -32,6 +32,7 @@
     rooftop_gap: {
       unit: 'gap', unitPlural: 'gaps', verb: 'Jump', runner: '\uD83C\uDFC3',
       markerIcon: '\uD83C\uDFC3', zoneIcon: '\uD83E\uDDF1', barLabel: 'The gap',
+      sweepIcon: '\uD83D\uDCA8', plateIcon: '\uD83E\uDE9C',
       ready: ['Line it up.', 'Wind is crossing.', 'Do not look down.', 'Shorter run-up this time.', 'Gravel underfoot.'],
       hit:   ['You land rolling.', 'Both feet, clean.', 'Gravel skids, you keep it.', 'Straight through.'],
       perfect: ['Dead centre. You barely feel it.', 'Perfect. You are already running again.'],
@@ -44,6 +45,7 @@
     conveyor_jump: {
       unit: 'belt', unitPlural: 'belts', verb: 'Step', runner: '\uD83D\uDC5F',
       markerIcon: '\uD83D\uDC5F', zoneIcon: '\uD83D\uDFE8', barLabel: 'The belt',
+      sweepIcon: '\u2699\uFE0F', plateIcon: '\uD83D\uDFE8',
       ready: ['The belt is up to speed.', 'Wait for the gap in the load.', 'Rollers, then plate, then rollers.', 'It does not stop for you.', 'Count it in.'],
       hit:   ['You ride the plate across.', 'On, and off, and moving.', 'You catch the flat section.', 'Clean transfer.'],
       perfect: ['Middle of the plate. Textbook.', 'You barely break stride.'],
@@ -56,6 +58,7 @@
     rockfall_dash: {
       unit: 'run', unitPlural: 'runs', verb: 'Break', runner: '\uD83E\uDDCD',
       markerIcon: '\uD83E\uDDCD', zoneIcon: '\uD83D\uDFE7', barLabel: 'The lull',
+      sweepIcon: '\uD83E\uDEA8', plateIcon: '\uD83D\uDFE7',
       ready: ['Listen for the lull.', 'It comes in waves. Wait for the trough.', 'Dust first, then stone.', 'The roof is talking.', 'Count between falls.'],
       hit:   ['You make the next pillar.', 'Stone lands where you were.', 'Through, and pressed against rock.', 'You get under the overhang.'],
       perfect: ['You move in the dead silence between falls.', 'Not a pebble touches you.'],
@@ -130,10 +133,14 @@
     };
   }
 
+
   /* ================================================================ CSS == */
+  /* The course is the arena's canvas now. What is left here is the readout
+     strip that lives under it: which gap you are on, how each one went, and
+     the two numbers that decide whether a gap is fair. */
 
   var CSS = [
-    '.pz-timing{display:flex;flex-direction:column;gap:16px;max-width:760px;margin:0 auto;width:100%}',
+    '.pz-timing{display:flex;flex-direction:column;gap:12px;width:100%}',
 
     '.pz-timing-head{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap}',
     '.pz-timing-head__t{font-size:15px;font-weight:700;color:var(--text)}',
@@ -148,40 +155,6 @@
     '.pz-timing-pip.is-perfect{background:var(--good);border-color:var(--good);box-shadow:0 0 12px rgba(95,207,141,.55)}',
     '.pz-timing-pip.is-miss{background:var(--bad);border-color:var(--bad)}',
 
-    '.pz-timing-bar{position:relative;height:82px;border-radius:14px;overflow:hidden;cursor:pointer;user-select:none;',
-    '  background:linear-gradient(180deg,#0a0e14,#05070a);border:1px solid var(--line);',
-    '  box-shadow:inset 0 0 46px rgba(0,0,0,.85)}',
-    '.pz-timing-bar:focus-visible{outline:2px solid var(--acc);outline-offset:3px}',
-    '.pz-timing-bar.is-dead{cursor:default;opacity:.62}',
-    '.pz-timing-bar.is-shake{animation:pzTimingShake .34s var(--ease)}',
-    '.pz-timing-bar.is-pop{animation:pzTimingPop .34s var(--ease)}',
-
-    '.pz-timing-hatch{position:absolute;inset:0;opacity:.5;',
-    '  background:repeating-linear-gradient(90deg,transparent 0 19px,rgba(255,255,255,.045) 19px 20px)}',
-
-    '.pz-timing-zone{position:absolute;top:0;bottom:0;border-radius:8px;',
-    '  background:linear-gradient(180deg,color-mix(in srgb,var(--acc) 34%,transparent),color-mix(in srgb,var(--acc) 12%,transparent));',
-    '  border-left:2px solid var(--acc);border-right:2px solid var(--acc);',
-    '  box-shadow:0 0 26px var(--acc-glow);transition:left .18s var(--ease),width .18s var(--ease)}',
-    '.pz-timing-core{position:absolute;top:0;bottom:0;background:color-mix(in srgb,var(--acc-2) 30%,transparent)}',
-
-    '.pz-timing-marker{position:absolute;top:0;bottom:0;width:4px;margin-left:-2px;border-radius:2px;',
-    '  background:linear-gradient(180deg,#fff,var(--acc-2));box-shadow:0 0 18px rgba(255,255,255,.6)}',
-    '.pz-timing-marker::after{content:"";position:absolute;left:50%;top:-1px;width:11px;height:11px;margin-left:-5.5px;',
-    '  border-radius:50%;background:var(--acc-2);box-shadow:0 0 14px var(--acc-glow)}',
-
-    '.pz-timing-ghost{position:absolute;top:0;bottom:0;width:3px;margin-left:-1.5px;border-radius:2px;opacity:.85}',
-    '.pz-timing-ghost.is-good{background:var(--good)}',
-    '.pz-timing-ghost.is-bad{background:var(--bad)}',
-
-    '.pz-timing-face{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;',
-    '  font-family:var(--font-mono);font-size:13px;letter-spacing:.16em;text-transform:uppercase;',
-    '  color:var(--text-2);text-shadow:0 2px 10px #000;pointer-events:none}',
-    '.pz-timing-face b{color:var(--acc-2);font-size:26px;letter-spacing:.04em;display:block;line-height:1.25}',
-
-    '.pz-timing-acts{display:flex;gap:10px;flex-wrap:wrap;align-items:center}',
-    '.pz-timing-go{flex:1 1 200px;min-height:52px;font-size:16px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}',
-
     '.pz-timing-tell{display:flex;gap:14px;flex-wrap:wrap;font-family:var(--font-mono);font-size:11px;color:var(--dim)}',
     '.pz-timing-tell b{color:var(--acc-2)}',
     '.pz-timing-tell .is-bad{color:var(--bad)}',
@@ -190,11 +163,45 @@
     '.pz-timing-say.is-bad{color:var(--bad)}',
     '.pz-timing-say.is-good{color:var(--good)}',
 
-    '@keyframes pzTimingShake{0%,100%{transform:translateX(0)}18%{transform:translateX(-9px)}38%{transform:translateX(8px)}',
-    '  58%{transform:translateX(-5px)}78%{transform:translateX(3px)}}',
-    '@keyframes pzTimingPop{0%{box-shadow:inset 0 0 46px rgba(0,0,0,.85)}35%{box-shadow:inset 0 0 60px rgba(95,207,141,.35)}',
-    '  100%{box-shadow:inset 0 0 46px rgba(0,0,0,.85)}}'
+    '.pz-timing-cap{font-family:var(--font-mono);font-size:10.5px;padding:2px 7px;border-radius:5px;',
+    '  background:#0c1016;border:1px solid var(--line);border-bottom-width:2px;color:var(--text-2)}',
+
+    '.pz-timing-arrive{font-size:13px;line-height:1.65;color:var(--text-2);margin-bottom:12px}',
+    '.pz-timing-arrive b{color:var(--acc-2)}'
   ].join('\n');
+
+  /* ============================================================ THE COURSE */
+  /*
+   * The abstract bar becomes a corridor you run down: ledge, chasm, ledge,
+   * chasm. Nothing about the numbers changed — the marker still sweeps at
+   * `speed` percent of the span per second, the landing is still `width`
+   * percent wide, and the window you have to commit in is still
+   * width / speed seconds, from about 490ms at tier 1 to about 120ms on the
+   * last gap of tier 6. What changed is where that window lives: it is now
+   * the moment the bridge is actually across the gap, and you spend it by
+   * arriving at the edge with your body rather than by pressing a key.
+   *
+   * Committing is judged and then RESOLVED — you are thrown across or you are
+   * thrown back. The player never stands in the gap, so there is no way to
+   * dawdle in mid-air and no way to get wedged in a tile that just went solid.
+   */
+
+  var LANE  = 9;      // playable rows; the marker sweeps the length of these
+  var RUN   = 4;      // ledge columns between gaps — the run-up
+  var GAPW  = 3;      // chasm columns
+  var PLATE_OFF = ' ';    // the arena substitutes a star for a falsy icon, so
+                          // "no bridge" has to be a space, not an empty string
+  var PRESS_IN  = 0.63;   // how flush against the lip counts as "committed"
+  var PRESS_OUT = 0.44;   // and how far back you must come to line up again
+  var JUDGE_COOL = 0.3;   // seconds, so one shove at the lip is one attempt
+  var KNOCKBACK = 2;      // tiles you are thrown back by a bad landing
+
+  function courseWidth(count) { return 2 + RUN + count * (GAPW + RUN); }
+  function chasmX(i) { return 1 + RUN + i * (GAPW + RUN); }
+  function launchX(i) { return chasmX(i) - 1; }
+  function landX(i) { return chasmX(i) + GAPW; }
+
+  function clamp01(v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
 
   /* ================================================================ MOUNT = */
 
@@ -203,80 +210,60 @@
   function mount(el, state, api, puzzle, skin) {
     var h = PS.ui.h;
     var C = puzzle.content;
+    var count = puzzle.gaps.length;
 
-    var rafId = null;
-    var timers = [];
-    var running = false;      // marker is sweeping and input is armed
     var finished = false;
-    var marker = puzzle.gaps[0] ? puzzle.gaps[0].startAt : 50;
-    var dir = puzzle.gaps[0] ? puzzle.gaps[0].dir : 1;
-    var lastTs = 0;
+    var arena = null;
+    var plates = [];        // per gap: array of prop handles across the chasm
+    var pads = [];          // per gap: the "press E to go" marker on the lip
+    var lastOpen = null;
+    var pressed = false;
+    var cool = 0;
+    var hudT = 0;
 
     /* --------------------------------------------------------------- dom -- */
-
-    var zoneEl   = h('div', { class: 'pz-timing-zone' });
-    var coreEl   = h('div', { class: 'pz-timing-core' });
-    var markerEl = h('div', { class: 'pz-timing-marker' });
-    var ghostEl  = h('div', { class: 'pz-timing-ghost', style: { display: 'none' } });
-    var faceEl   = h('div', { class: 'pz-timing-face' });
-
-    var barEl = h('div', {
-      class: 'pz-timing-bar', tabindex: '0', role: 'button',
-      'aria-label': 'Timing bar. Press space to commit.'
-    }, [
-      h('div', { class: 'pz-timing-hatch' }),
-      zoneEl, coreEl, ghostEl, markerEl, faceEl
-    ]);
 
     var pipsEl = h('div', { class: 'pz-timing-pips' });
     var tellEl = h('div', { class: 'pz-timing-tell' });
     var sayEl  = h('div', { class: 'pz-timing-say' });
-    var goBtn  = h('button', { class: 'pz-btn pz-btn--primary pz-timing-go', type: 'button' }, ['\u23CE  Go']);
-    var actsEl = h('div', { class: 'pz-timing-acts' }, [goBtn]);
-    var endEl  = h('div', {});
     var counterEl = h('div', { class: 'pz-timing-head__c' });
+    var stage = h('div', {});
+    var endEl = h('div', {});
+
+    var wrap = h('div', { class: 'pz-timing' }, [
+      h('div', { class: 'pz-timing-head' }, [
+        h('div', {}, [
+          h('div', { class: 'pz-timing-head__t', text: C.barLabel }),
+          h('div', { class: 'pz-timing-head__s' }, [
+            'Run at the edge \u2014 or stand on the mark and hit ',
+            h('b', { class: 'pz-timing-cap', text: 'SPACE' }),
+            '. You go when the crossing is there and not a moment after. Every ',
+            C.unit, ' after this one is narrower and faster.'
+          ])
+        ]),
+        counterEl
+      ]),
+      pipsEl,
+      stage,
+      sayEl,
+      tellEl,
+      endEl
+    ]);
+    PS.ui.append(el, wrap);
 
     /* -------------------------------------------------------------- util -- */
 
-    function after(ms, fn) {
-      var id = root.setTimeout(function () {
-        var i = timers.indexOf(id);
-        if (i >= 0) timers.splice(i, 1);
-        if (!finished) fn();
-      }, ms);
-      timers.push(id);
-      return id;
-    }
-
-    function stopLoop() {
-      if (rafId !== null) {
-        if (root.cancelAnimationFrame) root.cancelAnimationFrame(rafId);
-        else root.clearTimeout(rafId);
-        rafId = null;
-      }
-    }
-
-    function killTimers() {
-      for (var i = 0; i < timers.length; i++) root.clearTimeout(timers[i]);
-      timers.length = 0;
-    }
-
     function gap() { return puzzle.gaps[puzzle.index]; }
 
-    /* ------------------------------------------------------------ render -- */
-
-    function paintZone() {
-      var g = gap();
-      if (!g) return;
-      zoneEl.style.left = g.pos + '%';
-      zoneEl.style.width = g.width + '%';
-      var coreW = g.width * puzzle.perfectBand;
-      coreEl.style.left = (g.pos + g.width / 2 - coreW / 2) + '%';
-      coreEl.style.width = coreW + '%';
+    function pick(arr) {
+      // Flavour only, but it still has to come from the seeded rng: replaying a
+      // seed must reproduce the run exactly, including what the scene said to you.
+      return api.rng.pick(arr);
     }
 
-    function paintMarker() {
-      markerEl.style.left = marker + '%';
+    function say(text, kind) {
+      sayEl.className = 'pz-timing-say' + (kind ? ' is-' + kind : '');
+      sayEl.textContent = text;
     }
 
     function paintPips() {
@@ -300,177 +287,16 @@
       PS.ui.clear(tellEl);
       var lowEnergy = state.stats.energy < puzzle.energyPer * 2;
       PS.ui.append(tellEl, [
-        h('span', {}, ['landing ', h('b', { text: g ? g.width.toFixed(1) + '%' : '\u2014' }), ' wide']),
+        h('span', {}, ['crossing ', h('b', { text: g ? g.width.toFixed(1) + '%' : '\u2014' }), ' wide']),
         h('span', {}, ['sweep ', h('b', { text: g ? Math.round(g.speed) + '%/s' : '\u2014' })]),
+        h('span', {}, ['window ', h('b', { text: g ? Math.round(g.width / g.speed * 1000) + 'ms' : '\u2014' })]),
         h('span', { class: lowEnergy ? 'is-bad' : '' }, ['costs ', h('b', { text: '\u26A1 ' + puzzle.energyPer }), ' a go']),
         h('span', {}, ['a miss ', h('b', { class: 'is-bad', text: '\u2764\uFE0F -' + puzzle.missDamage })]),
         h('span', {}, ['clean ', h('b', { text: puzzle.hits + '/' + puzzle.gaps.length })])
       ]);
     }
 
-    function say(text, kind) {
-      sayEl.className = 'pz-timing-say' + (kind ? ' is-' + kind : '');
-      sayEl.textContent = text;
-    }
-
-    function face(big, small) {
-      PS.ui.clear(faceEl);
-      if (big) faceEl.appendChild(h('b', { text: big }));
-      if (small) faceEl.appendChild(h('span', { text: small }));
-    }
-
-    /* --------------------------------------------------------- the sweep -- */
-
-    function frame(ts) {
-      if (!running || finished) return;
-      if (!lastTs) lastTs = ts;
-      var dt = Math.min(0.05, (ts - lastTs) / 1000);    // clamp: tab-switch safety
-      lastTs = ts;
-
-      var g = gap();
-      marker += dir * g.speed * dt;
-      if (marker >= 100) { marker = 100 - (marker - 100); dir = -1; }
-      if (marker <= 0)   { marker = -marker; dir = 1; }
-      paintMarker();
-      schedule();
-    }
-
-    function schedule() {
-      if (root.requestAnimationFrame) rafId = root.requestAnimationFrame(frame);
-      else rafId = root.setTimeout(function () { frame(Date.now()); }, 16);
-    }
-
-    function armGap() {
-      var g = gap();
-      if (!g) return;
-      marker = g.startAt;
-      dir = g.dir;
-      lastTs = 0;
-      ghostEl.style.display = 'none';
-      barEl.classList.remove('is-dead');
-      paintZone();
-      paintMarker();
-      paintPips();
-      paintTell();
-
-      goBtn.disabled = true;
-      goBtn.textContent = '\u2026';
-      face('READY', g.readyLine);
-
-      // A beat of dread before every gap. It is what makes it a twitch game
-      // rather than a metronome you can zone out against.
-      after(320, function () {
-        face('SET', g.readyLine);
-        after(340, function () {
-          face('', '');
-          running = true;
-          goBtn.disabled = false;
-          goBtn.textContent = C.verb.toUpperCase() + '  \u2014  space';
-          barEl.focus();
-          schedule();
-        });
-      });
-    }
-
-    /* ------------------------------------------------------------ commit -- */
-
-    function commit() {
-      if (!running || finished || puzzle.done) return;
-      running = false;
-      stopLoop();
-
-      var g = gap();
-      g.landedAt = marker;
-
-      var left = g.pos, right = g.pos + g.width;
-      var centre = g.pos + g.width / 2;
-      var inside = marker >= left && marker <= right;
-      var perfect = inside && Math.abs(marker - centre) <= (g.width / 2) * puzzle.perfectBand;
-
-      ghostEl.style.left = marker + '%';
-      ghostEl.style.display = '';
-      ghostEl.className = 'pz-timing-ghost ' + (inside ? 'is-good' : 'is-bad');
-
-      // Every attempt is paid for whether it lands or not.
-      var tweak = { energy: -puzzle.energyPer };
-
-      if (perfect) {
-        g.result = 'perfect';
-        puzzle.hits++; puzzle.perfects++;
-        tweak.morale = 4;
-        api.toast(pick(C.perfect), 'good', 1500);
-        say(pick(C.perfect), 'good');
-        bump('is-pop');
-      } else if (inside) {
-        g.result = 'hit';
-        puzzle.hits++;
-        tweak.morale = 2;
-        say(pick(C.hit), 'good');
-        bump('is-pop');
-      } else {
-        g.result = 'miss';
-        puzzle.misses++;
-        // A miss is a hard landing, never a death. The run always continues.
-        tweak.health = -puzzle.missDamage;
-        tweak.morale = -3;
-        api.toast(pick(C.miss), 'bad', 1900);
-        say(pick(C.miss), 'bad');
-        bump('is-shake');
-      }
-
-      api.tweak(tweak);
-      barEl.classList.add('is-dead');
-      paintPips();
-      paintTell();
-      face(perfect ? 'PERFECT' : (inside ? 'CLEAR' : 'DOWN'), '');
-
-      goBtn.disabled = true;
-      goBtn.textContent = '\u2026';
-
-      after(perfect || inside ? 620 : 900, function () {
-        puzzle.index++;
-        if (puzzle.index >= puzzle.gaps.length) { runOut(); return; }
-        armGap();
-      });
-    }
-
-    function bump(cls) {
-      barEl.classList.remove('is-shake');
-      barEl.classList.remove('is-pop');
-      void barEl.offsetWidth;
-      barEl.classList.add(cls);
-    }
-
-    function pick(arr) {
-      // Flavour only, but it still has to come from the seeded rng: replaying a
-      // seed must reproduce the run exactly, including what the scene said to you.
-      return api.rng.pick(arr);
-    }
-
     /* ------------------------------------------------------------ endings -- */
-
-    function runOut() {
-      puzzle.done = true;
-      running = false;
-      stopLoop();
-      barEl.classList.add('is-dead');
-      face(puzzle.misses === 0 ? 'CLEAN' : 'THROUGH', '');
-      paintPips();
-
-      var clean = puzzle.misses === 0;
-      PS.ui.clear(actsEl);
-      PS.ui.clear(endEl);
-      PS.ui.append(endEl, [
-        h('div', { class: 'pz-intro', text: (clean ? C.cleared : C.failedAll) + ' ' +
-          puzzle.hits + ' of ' + puzzle.gaps.length + ' clean' +
-          (puzzle.perfects ? ', ' + puzzle.perfects + ' of those dead centre' : '') + '.' }),
-        h('div', { class: 'pz-choices' }, [
-          choiceBtn(C.onward, 'sprint'),
-          choiceBtn(C.breathe, 'rest')
-        ])
-      ]);
-      api.flash();
-    }
 
     function choiceBtn(spec, id) {
       return h('button', {
@@ -483,11 +309,23 @@
       ]);
     }
 
+    function endChoices() {
+      return h('div', { class: 'pz-choices' }, [
+        choiceBtn(C.onward, 'sprint'),
+        choiceBtn(C.breathe, 'rest')
+      ]);
+    }
+
+    function endLine() {
+      var clean = puzzle.misses === 0;
+      return (clean ? C.cleared : C.failedAll) + ' ' +
+        puzzle.hits + ' of ' + puzzle.gaps.length + ' clean' +
+        (puzzle.perfects ? ', ' + puzzle.perfects + ' of those dead centre' : '') + '.';
+    }
+
     function finishRun(choice) {
       if (finished) return;
       finished = true;
-      stopLoop();
-      killTimers();
 
       var clean = puzzle.misses === 0;
       var mostly = puzzle.hits >= Math.ceil(puzzle.gaps.length * 0.6);
@@ -523,8 +361,6 @@
     function bailOut() {
       if (finished || puzzle.done) return;
       finished = true;
-      stopLoop();
-      killTimers();
       api.finish({
         outcome: 'fail',
         stats: { energy: -10, morale: -8 },
@@ -536,61 +372,347 @@
       });
     }
 
-    /* ------------------------------------------------------------- input -- */
+    /* ------------------------------------------------------- degraded mode -- */
 
-    function onKey(ev) {
-      if (finished) return;
-      if (ev.key === ' ' || ev.key === 'Spacebar' || ev.key === 'Enter' || ev.key === 'ArrowDown') {
-        ev.preventDefault();
-        if (running) commit();
+    if (!PS.arena || typeof PS.arena.create !== 'function') {
+      PS.ui.append(endEl, [h('div', { class: 'pz-intro', text: endLine() }), endChoices()]);
+      paintPips();
+      paintTell();
+      return;
+    }
+
+    /* ------------------------------------------------------------- course -- */
+
+    var MW = courseWidth(count), MH = LANE + 2;
+    var tiles = [], y, x, row, i;
+    for (y = 0; y < MH; y++) {
+      row = [];
+      for (x = 0; x < MW; x++) row.push((y === 0 || y === MH - 1 || x === 0 || x === MW - 1) ? 1 : 0);
+      tiles.push(row);
+    }
+    // The chasms are solid all the way through. You cannot walk a gap; the only
+    // way past one is to be thrown across it, which is the whole engine.
+    for (i = 0; i < count; i++) {
+      for (x = chasmX(i); x < chasmX(i) + GAPW; x++) {
+        for (y = 1; y < MH - 1; y++) tiles[y][x] = 1;
       }
     }
 
-    document.addEventListener('keydown', onKey);
-    barEl.addEventListener('click', function () { if (running) commit(); });
-    goBtn.addEventListener('click', function () { if (running) commit(); });
+    var midRow = Math.round((LANE + 1) / 2);
+    var exitAt = landX(count - 1) + 2;
 
-    /* ------------------------------------------------------------ layout -- */
-
-    PS.ui.append(el, h('div', { class: 'pz-timing' }, [
-      h('div', { class: 'pz-timing-head' }, [
-        h('div', {}, [
-          h('div', { class: 'pz-timing-head__t', text: C.barLabel }),
-          h('div', { class: 'pz-timing-head__s' },
-            ['Stop the marker inside the lit band. ',
-              PS.ui.h('strong', { text: 'Space' }), ', ', PS.ui.h('strong', { text: 'Enter' }),
-              ', or click the bar. Every ', C.unit, ' after this one is narrower and faster.'])
-        ]),
-        counterEl
-      ]),
-      pipsEl,
-      barEl,
-      sayEl,
-      actsEl,
-      tellEl,
-      endEl,
-      h('button', {
-        class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button',
-        onclick: bailOut
-      }, ['\u21A9 Not worth it \u2014 go around'])
-    ]));
+    arena = PS.arena.create(stage, {
+      map: { w: MW, h: MH, tiles: tiles },
+      spawn: { x: 2, y: midRow },
+      avatar: C.runner,
+      light: state.stats.light,
+      lightCurve: function (v) { return 3.0 + Math.max(0, Math.min(100, v)) / 100 * 2.2; },
+      tileSize: 42,
+      darkness: 0.8,
+      memory: 0.7,
+      onTick: onTick
+    });
+    if (!arena) {
+      PS.ui.append(endEl, [h('div', { class: 'pz-intro', text: endLine() }), endChoices()]);
+      paintPips();
+      paintTell();
+      return;
+    }
 
     live = {
       stop: function () {
+        // The most timing-sensitive scene in the game owns exactly one thing —
+        // the arena — and it owns no timers and no frame loop of its own, so
+        // there is precisely one thing to kill and this kills it.
         finished = true;
-        running = false;
-        stopLoop();
-        killTimers();
-        document.removeEventListener('keydown', onKey);
+        if (arena) { arena.destroy(); arena = null; }
+        plates.length = 0;
+        pads.length = 0;
       }
     };
+    arena.revealAll();
 
-    paintZone();
-    paintMarker();
+    /* ------------------------------------------------------- the sweep ---- */
+    /* One marker per gap, running the length of the lane. It covers the lane in
+       100 / speed seconds and comes back in the same, so the bridge is up for
+       width / speed out of every 200 / speed — the dwell curve, untouched, now
+       measured in bridge rather than in bar. */
+
+    for (i = 0; i < count; i++) {
+      (function (gi) {
+        var g = puzzle.gaps[gi];
+        var cx = chasmX(gi) + 1;                       // the middle of the chasm
+        var handle = arena.patrol({
+          route: [[cx, 1], [cx, LANE]],
+          speed: (LANE - 1) * g.speed / 100,
+          wait: 0,
+          icon: C.sweepIcon,
+          label: C.barLabel,
+          vision: false
+        });
+        g._raw = handle && handle.raw;
+        phase(g);
+        plates.push(null);
+        pads.push(null);
+      })(i);
+    }
+
+    /** The bridge for one gap: a plate on every tile of the chasm, present or
+        absent together. Only the gap in front of you has them — a chasm you
+        have already crossed is just a hole in the roofline again. */
+    function makePlates(gi) {
+      clearPlates(gi);
+      if (gi >= count) return;
+      var pl = [];
+      for (var px = chasmX(gi); px < chasmX(gi) + GAPW; px++) {
+        for (var py = 1; py <= LANE; py++) {
+          pl.push(arena.prop({
+            x: px, y: py, icon: PLATE_OFF, label: ' ', hint: ' ',
+            trigger: 'press', radius: -1, glow: false, emits: 0,
+            once: false, botSkip: true,
+            onActivate: function () { /* scenery */ }
+          }));
+        }
+      }
+      plates[gi] = pl;
+    }
+
+    function clearPlates(gi) {
+      var pl = plates[gi];
+      if (!pl) return;
+      for (var k = 0; k < pl.length; k++) pl[k].remove();
+      plates[gi] = null;
+    }
+
+    /** Put the marker where build() said it starts, going the way it said. */
+    function phase(g) {
+      var raw = g._raw;
+      if (!raw || !raw.route || raw.route.length < 2) return;
+      var f = clamp01((g.startAt || 0) / 100);
+      var leg = g.dir < 0 ? 1 : 0;
+      var t = g.dir < 0 ? (1 - f) : f;
+      raw.leg = leg;
+      raw.t = Math.min(0.999, Math.max(0, t));
+      var a = raw.route[leg], b = raw.route[(leg + 1) % raw.route.length];
+      raw.x = a[0] + (b[0] - a[0]) * raw.t;
+      raw.y = a[1] + (b[1] - a[1]) * raw.t;
+      raw.dir = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    }
+
+    /** Where the marker is, on the same 0..100 scale build() reasoned in. */
+    function markerPct(g) {
+      if (!g || !g._raw) return 50;
+      return clamp01((g._raw.y - 1.5) / (LANE - 1)) * 100;
+    }
+
+    function isOpen(g) {
+      var m = markerPct(g);
+      return m >= g.pos && m <= g.pos + g.width;
+    }
+
+    function setPlates(gi, icon) {
+      var pl = plates[gi];
+      if (!pl) return;
+      for (var k = 0; k < pl.length; k++) pl[k].setIcon(icon);
+    }
+
+    /* ---------------------------------------------------------- the ledge -- */
+
+    function makePad(gi) {
+      if (pads[gi]) { pads[gi].remove(); pads[gi] = null; }
+      if (gi >= count) return;
+      pads[gi] = arena.prop({
+        x: launchX(gi), y: midRow,
+        icon: '\u2757', label: C.verb + ' ' + C.barLabel.toLowerCase(), hint: 'press E when it is there',
+        trigger: 'press', radius: 2.2, glow: true, emits: 0.9, tint: '#e2a84e',
+        once: false, botSkip: false,
+        onActivate: function () { judge(); }
+      });
+    }
+
+    /**
+     * The arena marks a prop used the moment it fires, which is right for a
+     * cache and wrong for a starting line you are meant to come back to. Clear
+     * it after every attempt so the mark stays live — and so the autoplay bot,
+     * which only ever walks to things it has not used, can keep trying.
+     */
+    function refreshPad() {
+      var p = pads[puzzle.index];
+      if (p && p.raw) p.raw.done = false;
+    }
+
+    var exitStation = arena.station({
+      x: exitAt, y: midRow,
+      icon: C.onward.icon, label: 'The far side', hint: 'walk in, or press E',
+      radius: 1.3, emits: 1.9,
+      onEnter: function (panel) {
+        PS.ui.append(panel, [
+          h('div', { class: 'pz-timing-arrive', text: endLine() }),
+          endChoices()
+        ]);
+      }
+    });
+
+    /* ------------------------------------------------------------- commit -- */
+
+    function armGap() {
+      var g = gap();
+      lastOpen = null;
+      if (!g) return;
+      makePlates(puzzle.index);
+      makePad(puzzle.index);
+      say(g.readyLine);
+      paintPips();
+      paintTell();
+      arena.ping(launchX(puzzle.index), midRow);
+    }
+
+    /**
+     * One attempt. Whatever the marker reads at this instant is where you come
+     * down — exactly the old bar, judged at the moment your shoulder hits the
+     * lip instead of at the moment you hit the key.
+     */
+    function judge() {
+      if (finished || puzzle.done) return;
+      if (cool > 0) { refreshPad(); return; }
+      var g = gap();
+      if (!g || !arena) return;
+
+      cool = JUDGE_COOL;
+      var pl = arena.player();
+      var m = markerPct(g);
+      g.landedAt = m;
+
+      var left = g.pos, right = g.pos + g.width;
+      var centre = g.pos + g.width / 2;
+      var inside = m >= left && m <= right;
+      var perfect = inside && Math.abs(m - centre) <= (g.width / 2) * puzzle.perfectBand;
+
+      // Every attempt is paid for whether it lands or not.
+      var tweak = { energy: -puzzle.energyPer };
+
+      if (perfect) {
+        g.result = 'perfect';
+        puzzle.hits++; puzzle.perfects++;
+        tweak.morale = 4;
+        api.toast(pick(C.perfect), 'good', 1500);
+        say(pick(C.perfect), 'good');
+      } else if (inside) {
+        g.result = 'hit';
+        puzzle.hits++;
+        tweak.morale = 2;
+        say(pick(C.hit), 'good');
+      } else {
+        g.result = 'miss';
+        puzzle.misses++;
+        // A miss is a hard landing, never a death. The run always continues.
+        tweak.health = -puzzle.missDamage;
+        tweak.morale = -3;
+        api.toast(pick(C.miss), 'bad', 1900);
+        say(pick(C.miss), 'bad');
+      }
+
+      api.tweak(tweak);
+
+      if (inside) {
+        var lx = landX(puzzle.index);
+        arena.dust(launchX(puzzle.index), pl.ty, 10, '#f8d493');
+        arena.teleport(lx, pl.ty);
+        arena.ping(lx, pl.ty, perfect ? '#5fcf8d' : null);
+        if (perfect) arena.shake(4, 0.18);
+        setPlates(puzzle.index, PLATE_OFF);
+        clearPlates(puzzle.index);
+        if (pads[puzzle.index]) { pads[puzzle.index].remove(); pads[puzzle.index] = null; }
+        puzzle.index++;
+        if (puzzle.index >= puzzle.gaps.length) runOut();
+        else armGap();
+      } else {
+        arena.hit('#e2695f');
+        arena.shake(11, 0.4);
+        arena.dust(launchX(puzzle.index), pl.ty, 14, '#e2695f');
+        arena.teleport(Math.max(1, launchX(puzzle.index) - KNOCKBACK), pl.ty);
+        refreshPad();                    // the mark stays live; go again
+        paintPips();
+        paintTell();
+      }
+      paintHud();
+    }
+
+    function runOut() {
+      puzzle.done = true;
+      lastOpen = null;
+      paintPips();
+      paintTell();
+      say(endLine(), puzzle.misses === 0 ? 'good' : null);
+      api.flash();
+      if (arena) arena.ping(exitAt, midRow);
+      if (exitStation) exitStation.pulse();
+    }
+
+    /* --------------------------------------------------------------- tick -- */
+
+    function onTick(dt) {
+      if (finished || !arena) return;
+      if (cool > 0) cool -= dt;
+      hudT += dt;
+
+      var g = gap();
+      if (g && !puzzle.done) {
+        var open = isOpen(g);
+        if (open !== lastOpen) {
+          lastOpen = open;
+          setPlates(puzzle.index, open ? C.plateIcon : PLATE_OFF);
+        }
+
+        // Arriving at the lip IS the commit. You have to come off it and line
+        // up again before you get another go, which is what makes it a run-up
+        // rather than a button you can lean on.
+        var pl = arena.player();
+        var lx = launchX(puzzle.index);
+        if (!pressed) {
+          if (pl.tx === lx && pl.x >= lx + PRESS_IN) { pressed = true; judge(); }
+        } else if (pl.tx !== lx || pl.x < lx + PRESS_OUT) {
+          pressed = false;
+        }
+      }
+
+      if (hudT >= 0.1) { hudT = 0; paintHud(); }
+    }
+
+    /* ---------------------------------------------------------------- HUD -- */
+
+    var cGap  = arena.chip(C.unit, '\uD83D\uDD73\uFE0F');
+    var cRun  = arena.chip('Clean', '\u2705');
+    var mWin  = arena.meter('Crossing', '\u23F1\uFE0F');
+
+    arena.note('The crossing is only there while the mark is in the lit band. Back off, line it up, and go on the beat.');
+    arena.button('\u21A9 Not worth it \u2014 go around', bailOut, 'pz-btn--danger');
+
+    function paintHud() {
+      if (!arena || finished) return;
+      var g = gap();
+      if (puzzle.done || !g) {
+        cGap.set('done', 'good');
+        cRun.set(puzzle.hits + '/' + puzzle.gaps.length, puzzle.misses ? 'warn' : null);
+        mWin.set(0, 'across');
+        return;
+      }
+      var m = markerPct(g);
+      var open = isOpen(g);
+      var away = open ? 0 : Math.min(Math.abs(m - g.pos), Math.abs(m - (g.pos + g.width)));
+      cGap.set((puzzle.index + 1) + ' of ' + puzzle.gaps.length);
+      cRun.set(puzzle.hits + '/' + puzzle.gaps.length, puzzle.misses ? 'warn' : null);
+      mWin.set(open ? 100 : Math.max(0, 100 - away * 3.2), open ? 'GO' : 'wait', open ? null : 'warn');
+    }
+
+    /* -------------------------------------------------------------- start -- */
+
     paintPips();
     paintTell();
     say('Three, two, one.');
     armGap();
+    paintHud();
+    arena.focus();
   }
 
   function unmount() {
