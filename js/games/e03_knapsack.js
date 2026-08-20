@@ -561,7 +561,11 @@
         var p = arena.player();
         putOnFloor(it, freeNear(p.tx, p.ty));
       }
-      // What you plainly cannot lift any more stops advertising itself.
+      // What you plainly cannot lift any more stops advertising itself. The
+      // re-arm matters: the arena latches `done` on a thing the moment you
+      // step on it, and it latches before it checks the trigger — so an item
+      // that refused you once for weight would stay dead to walking for the
+      // rest of the scene, long after you had put something down to make room.
       for (uid in props) {
         if (!props[uid]) continue;
         var item = byUid(puzzle, uid);
@@ -569,6 +573,7 @@
         var ok = fits(item);
         props[uid].raw.tint = ok ? null : '#e2695f';
         props[uid].raw.hint = ok ? (item.w + ' kg \u00B7 walk onto it') : (item.w + ' kg \u00B7 too much for your back');
+        if (ok) props[uid].raw.done = false;
       }
     }
 
