@@ -55,6 +55,28 @@
     return 1;
   }
 
+  function isDanger(node) {
+    var cls = node.className || '';
+    return typeof cls === 'string' && cls.indexOf('pz-btn--danger') >= 0;
+  }
+
+  /**
+   * Down-weighting danger to 0.05 only helps while something else is on offer.
+   * In an arena scene the give-up button sits on the foot and stays enabled
+   * with the panel shut, so once the walking is done it is frequently the ONLY
+   * candidate — and a weighted pick from a pool of one takes it every time,
+   * whatever its weight. The bot was forfeiting scenes it could solve.
+   *
+   * So danger controls are off the table until the bot has actually spent its
+   * scene trying. Late on they come back, because several of them are real
+   * branches ("force it", "break cover and run") rather than surrenders, and
+   * the bot should still cover those.
+   */
+  function desperate() {
+    return sceneClicks > CLICK_BUDGET * 0.6 ||
+           (Date.now() - sceneStart) > TIME_BUDGET * 0.6;
+  }
+
   /* --------------------------------------------------------------- arena -- */
   /* A bot cannot press W. arena.botGoTo() walks the real tile path instantly,
      firing every step event a human walk would, so an arena scene plays out
@@ -97,6 +119,14 @@
   function clickSomething() {
     var nodes = Array.prototype.slice.call(document.querySelectorAll(SELECTOR));
     if (!nodes.length) return false;
+    if (!desperate()) {
+      var safe = [];
+      for (var i = 0; i < nodes.length; i++) if (!isDanger(nodes[i])) safe.push(nodes[i]);
+      // Nothing constructive left. Say so rather than reaching for the exit —
+      // the caller falls back to autoSolve(), which is a real solve.
+      if (!safe.length) return false;
+      nodes = safe;
+    }
     var rng = rngFor('click');
     var node = rng.weighted(nodes, weightOf);
     if (!node) return false;
@@ -149,7 +179,9 @@
     // opens is ordinary DOM the click path already knows how to drive.
     if (driveArena()) { updateBadge(); return; }
 
-    clickSomething();
+    // Walked out of things to do and nothing constructive left to press: take
+    // the engine's own solution rather than idling until the budget expires.
+    if (!clickSomething() && scene && !scene.finished) giveUpOnScene();
     updateBadge();
   }
 
