@@ -812,9 +812,14 @@
         try { opts.onStep(tx, ty, arena); } catch (e) { if (root.console) console.warn('[arena] onStep threw:', e); }
       }
       // 'step' things fire the moment you stand on them.
+      // Skip only what is truly gone. `fire()` is the single authority on
+      // whether a thing may fire again — it blocks on `once && done`, not on
+      // `done` alone. Pre-filtering on `done` here meant a repeatable step
+      // prop fired exactly once and then went silent even with `once:false`,
+      // which silently broke pouring in e15 after the first pour.
       for (var i = 0; i < things.length; i++) {
         var t = things[i];
-        if (t.gone || t.done) continue;
+        if (t.gone) continue;
         if (t.trigger !== 'step') continue;
         if (t.tx === tx && t.ty === ty) fire(t);
       }
