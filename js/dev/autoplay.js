@@ -28,14 +28,15 @@
   var sceneClicks = 0;
   var sceneStart = 0;
   var sceneCount = 0;
+  var arenaMoves = 0;
   var CLICK_BUDGET = 60;
   var TIME_BUDGET = 26000;
+  var ARENA_BUDGET = 40;
 
   // Controls the bot will click. Deliberately generic so future engines work
   // with no changes: anything enabled and clickable inside the stage.
   var SELECTOR = [
-    '.ps-stage__inner button:not(:disabled)',
-    '.ps-stage__inner .pz-crawl-cell.is-step'
+    '.ps-stage__inner button:not(:disabled)'
   ].join(',');
 
   function rngFor(salt) {
@@ -49,10 +50,48 @@
     if (cls.indexOf('pz-btn--danger') >= 0) return 0.05;    // "turn back" — rarely
     if (cls.indexOf('pz-btn--ghost') >= 0) return 0.02;     // menu — basically never
     if (cls.indexOf('pz-choice') >= 0) return 3;            // real branches are the point
-    if (cls.indexOf('pz-crawl-cell') >= 0) return 2.4;
     if (cls.indexOf('pz-esc-obj') >= 0) return 2.2;
     if (cls.indexOf('pz-esc-key') >= 0) return 1.1;
     return 1;
+  }
+
+  /* --------------------------------------------------------------- arena -- */
+  /* A bot cannot press W. arena.botGoTo() walks the real tile path instantly,
+     firing every step event a human walk would, so an arena scene plays out
+     exactly the same way — and works with no frames at all.                  */
+
+  function driveArena() {
+    var ar = PS.arena && PS.arena.active();
+    if (!ar) return false;
+    if (arenaMoves > ARENA_BUDGET) return false;
+
+    var targets = ar.botTargets();
+    if (!targets.length) return false;
+
+    var here = ar.player();
+    var props = [], stations = [];
+    for (var i = 0; i < targets.length; i++) {
+      var t = targets[i];
+      if (t.done || t.skip || !t.reachable) continue;
+      (t.kind === 'station' ? stations : props).push(t);
+    }
+
+    // Strip the room first, then go and use the console. That is what a
+    // scavenger would do, and it exercises far more of each engine.
+    var pool = props.length ? props : stations;
+    if (!pool.length) return false;
+
+    var best = null, bestD = 1e9;
+    for (var j = 0; j < pool.length; j++) {
+      var d = Math.abs(pool[j].x - here.tx) + Math.abs(pool[j].y - here.ty);
+      if (d < bestD) { bestD = d; best = pool[j]; }
+    }
+    if (!best) return false;
+
+    arenaMoves++;
+    if (!ar.botGoTo(best.id)) return false;
+    ar.botInteract();
+    return true;
   }
 
   function clickSomething() {
@@ -106,6 +145,10 @@
       if (overClicks || overTime) { giveUpOnScene(); return; }
     }
 
+    // An arena scene is walked, not clicked. Walk first; whatever panel that
+    // opens is ordinary DOM the click path already knows how to drive.
+    if (driveArena()) { updateBadge(); return; }
+
     clickSomething();
     updateBadge();
   }
@@ -115,6 +158,7 @@
     var scene = PS.engine.currentScene();
     badge = PS.ui.devBadge(
       'BOT \u00B7 ' + (scene ? scene.engine.id : 'crossroad') +
+      (PS.arena && PS.arena.active() ? ' \u00B7 walking' : '') +
       ' \u00B7 depth ' + (st ? st.depth : 0) +
       ' \u00B7 scenes ' + sceneCount
     );
@@ -128,7 +172,7 @@
     PS.autoplay.seed = opts.seed || null;
 
     PS.engine.on(function (evt) {
-      if (evt === 'scene') { sceneClicks = 0; sceneStart = Date.now(); sceneCount++; }
+      if (evt === 'scene') { sceneClicks = 0; arenaMoves = 0; sceneStart = Date.now(); sceneCount++; }
     });
 
     if (root.console) console.info('[autoplay] running. ?speed=2 to go faster, ?dev=0 to stop.');

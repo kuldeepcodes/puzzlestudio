@@ -135,6 +135,7 @@ const CORE = [
   'js/core/director.js',
   'js/core/save.js',
   'js/core/ui.js',
+  'js/core/arena.js',
   'js/core/crossroad.js',
   'js/core/engine.js',
   'js/main.js'

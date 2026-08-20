@@ -37,7 +37,7 @@ No server, no build, no npm, no bundler. That imposes hard rules:
 | **No `import` / `export`.** Classic scripts and the `PuzzleStudio` global only. | ES modules are CORS-blocked on `file://`. The page would simply not run. |
 | **No `fetch()`, no `XMLHttpRequest`.** | Also CORS-blocked on `file://`. Dynamically injected `<script src=...>` *is* allowed and is what the loader uses. |
 | **No external dependencies.** No CDN, no web fonts, no libraries, no analytics, no URLs. | The game is fully offline. |
-| **DOM + CSS + emoji only.** No image files, no `<canvas>`. | Zero assets to ship or fail to load. |
+| **DOM + CSS + emoji only.** No image files. `<canvas>` **only** inside the arena layer (see §8b). | Zero assets to ship or fail to load. |
 | **Target current Chrome/Edge.** | ES5-flavoured JS is safest and is what the core uses. |
 
 `tools/smoke-test.js` greps for every one of these and fails the build.
@@ -416,6 +416,112 @@ function unmount() {
   while (teardownFns.length) { try { teardownFns.pop()(); } catch (e) {} }
 }
 ```
+
+---
+
+## 8b. `PuzzleStudio.arena` — the free-movement layer
+
+An engine does not have to be a panel you click. `js/core/arena.js` gives you a
+top-down explorable map: an avatar with real acceleration and friction that the
+player drives with **WASD, arrow keys, hold-to-steer with the mouse, click-to-move
+pathfinding, or touch drag**, colliding against a tile grid, lit by a radial mask
+whose radius is driven by the run's **`light` stat**.
+
+**Canvas 2D is allowed inside the arena and nowhere else.** This is a deliberate
+revision of the DOM-only rule in §1 — smooth 60fps movement with a light mask is
+not practical in DOM. Your **HUD, your panels and all of your puzzle UI stay DOM.**
+Everything else in §1 still stands: no libraries, no CDN, no image assets, no ES
+modules, no `fetch`, no `Math.random`.
+
+### Spatialising an existing engine in ten lines
+
+`arena.station()` is the whole point. Your engine keeps the DOM panel it already
+has; that panel now only opens when the player has physically **walked to a console**.
+
+```js
+function mount(el, state, api, puzzle, skin) {
+  var host = PS.ui.h('div', {});
+  PS.ui.append(el, host);
+
+  var a = PS.arena.create(host, {
+    map:    { w: 21, h: 15, tiles: puzzle.grid },   // tiles[y][x], 1 = solid
+    spawn:  { x: 1, y: 1 },
+    light:  state.stats.light,
+    avatar: '\uD83E\uDDCD',
+    onStep: function (tx, ty) { /* charge the move, drain light, whatever */ }
+  });
+  teardownFns.push(function () { a.destroy(); });
+
+  a.station({
+    x: 6, y: 4, icon: '\uD83D\uDCDF', label: 'Relay console',
+    onEnter:  function (panelEl) { renderMyExistingPanel(panelEl); },  // built once
+    onSolved: function () { a.setTile(9, 4, false); a.ping(9, 4); }    // door opens
+  });
+}
+```
+
+`onEnter` runs **once**, the first time the player walks into range. Walking away
+hides the panel; walking back re-attaches **the exact same DOM nodes**, so any
+half-entered code, part-built stack or selected row survives untouched.
+
+### `PS.arena.create(hostEl, opts)` — options
+
+| option | default | meaning |
+|---|---|---|
+| `map` | — | `[[0,1..]]`, `{w,h,tiles}` or `{w,h,wallAt(x,y)}`. Truthy = solid. |
+| `spawn` | first open tile | `{x,y}` in tile coords |
+| `light` | `100` | the `light` stat; drives the light mask radius |
+| `lightCurve` | built-in | `function (light) -> radius in tiles` |
+| `darkness` | `.955` | how black the unlit world goes, `0..1` |
+| `memory` | `.26` | how visible already-explored ground stays |
+| `tileSize` | auto-fit | px per tile; omit and the arena fits the map |
+| `avatar` | `🧍` | emoji drawn as the player |
+| `onStep(tx,ty,a)` | — | fires once per **tile** entered (diagonals charge both) |
+| `onTick(dt,a)` | — | per frame, seconds |
+| `onDetect(patrol,a)` | — | a patrol's vision cone found you |
+| `compact` | `false` | a shorter arena for scenes that are mostly panel |
+
+### The instance
+
+```
+world      station(spec) prop(spec) patrol(spec)
+           setTile(x,y,solid) isSolid(x,y) isSeen(x,y) walkable(x,y)
+           reveal(x,y,r) revealAll() path(x,y)
+light      setLight(v) light() lightRadius() setDarkness(v) setMemory(v)
+avatar     player() teleport(x,y) goTo(x,y) stop() setAvatar(icon)
+juice      shake(mag,dur) hit(color) dust(x,y,n,color) ping(x,y,color) retint()
+DOM        el canvas hud foot panel panelBody
+           chip(label,icon) meter(label,icon) button(label,fn,cls) note(text)
+           closePanel()
+control    pause(v) isPaused() focus() destroy()
+bot        botTargets() botGoTo(idOrXY) botInteract()
+```
+
+- **`station(spec)`** → `{ id, x, y, solved, solve(), close(), openNow(), setLabel(), setIcon(), move(), pulse(), remove() }`.
+  `spec`: `x y icon label hint radius emits onEnter(panelEl,a,handle) onOpen onExit onSolved`.
+- **`prop(spec)`** — anything you walk onto or press **E** at: caches, hazards, doors.
+  `spec`: `x y icon label hint trigger:'step'|'press'|'proximity' emits glow tint once botSkip onActivate`.
+  Set `botSkip: true` on things the autoplay bot should not deliberately walk into.
+- **`patrol(spec)`** — `route:[[x,y]…] speed wait icon vision:{range,fov} onDetect`.
+  Vision cones are drawn, line-of-sight checked, and patrols carry their own light.
+- **`chip/meter/button/note`** give you the arena's HUD styling for free. Do **not**
+  write CSS for `.ps-arena*` — the arena owns its look and two engines redefining
+  the same class is a contract violation (`tools/review-engines.js` fails you).
+
+### Lifecycle — this one is not optional
+
+The arena owns one `requestAnimationFrame` loop and listeners on `document` and
+`window`. **Call `a.destroy()` from your `unmount()`.** `js/core/engine.js` also
+destroys any arena that outlives its scene as a safety net, but relying on the net
+is how you leak a keyboard handler into somebody else's puzzle.
+
+### Teaching the bot to play your arena
+
+The `?dev=1` autoplay bot cannot press W. `botGoTo()` walks the real tile path
+**instantly**, firing every step event a human walk would, so an arena scene plays
+out identically and works with no animation frames at all. The bot already knows
+to strip every `prop` and then use the `station`s — you get that for free, and
+`autoSolve()` remains your headless fallback.
 
 ---
 

@@ -53,6 +53,26 @@ somewhere else with an empty pack and thirty health. There is no Game Over scree
 
 ---
 
+## You walk it, you don't click it
+
+Scenarios are not forms. `js/core/arena.js` is a top-down action layer: an avatar
+with real acceleration and friction that you steer with **WASD, the arrow keys, the
+mouse — hold to move toward the cursor, click to have it path around walls — or a
+touch drag**. It collides against the tile grid with corner-sliding so you never
+snag, a camera follows you with a dead-zone, and a radial light mask makes your
+**light stat literally how far you can see**. At six light you are looking at one
+tile of floor and a wall of black.
+
+You do not choose an option from a list; you walk up to the thing. A console only
+opens its panel once you are standing at it, and closes when you walk away —
+with everything you had half-typed into it still there when you come back.
+
+`grid_crawl` is the reference conversion: a dark maze you actually crawl, where
+the fuel caches are objects you have to find and walk onto, and the way out is a
+place you have to reach.
+
+---
+
 ## Playing
 
 Double-click `index.html`, pick **New run**, and go. Optionally type a seed first — the
@@ -156,7 +176,10 @@ js/core/profile.js      signals -> playstyle
 js/core/registry.js     engine registration, validation, CSS injection
 js/core/director.js     scoring, biome ring, overrides, no-dead-end ladder
 js/core/crossroad.js    the beat between encounters
-js/core/ui.js           HUD, stage, transitions, toasts, title screen
+js/core/ui.js          HUD, stage, transitions, toasts, title screen
+js/core/arena.js       the free-movement layer: avatar, collision, camera,
+                       light mask, patrols, and arena.station() — the adapter
+                       that puts an engine's existing panel behind a walk
 js/core/save.js         localStorage, degrading gracefully
 js/core/engine.js       boot and the scene lifecycle
 js/core/loader.js       injects all 20 engine files, tolerating missing ones

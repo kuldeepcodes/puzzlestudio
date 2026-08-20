@@ -98,7 +98,8 @@ function loadRoster(files) {
   vm.createContext(sandbox);
 
   for (const f of ['js/core/rng.js', 'js/core/state.js', 'js/core/profile.js', 'js/core/registry.js',
-                   'js/core/director.js', 'js/core/save.js', 'js/core/ui.js', 'js/core/crossroad.js']) {
+                   'js/core/director.js', 'js/core/save.js', 'js/core/ui.js', 'js/core/arena.js',
+                   'js/core/crossroad.js']) {
     vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), sandbox, { filename: f });
   }
 
