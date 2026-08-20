@@ -270,6 +270,35 @@ PZ_TRANSITIONS=5000 node tools/smoke-test.js     # longer soak
 PZ_SEED=whatever    node tools/smoke-test.js     # a different run
 ```
 
+### The two checks it cannot make
+
+```
+node tools/review-engines.js     # every engine against CONTRACT.md
+node tools/browser-check.js      # what only a real browser can show
+```
+
+`browser-check.js` exists for one failure the sandbox is blind to: **a leaked animation
+frame**. The arena owns a frame loop per scene, so a scene that fails to call `destroy()`
+leaves its loop running forever and every later scene shares the machine with a corpse.
+Nothing else in the project fails this quietly.
+
+The obvious test for it is wrong. "Are frames still firing after I leave a scene?" is
+worthless now that all twenty engines are arena-based, because the scene you moved *to*
+is legitimately rendering at 60fps — park on another engine as a "static control" and you
+measure the live arena while reporting the dead one. It does not come back inconclusive;
+it comes back as a confident catastrophe. That false positive really happened during
+review and looked like a twelve-of-twelve disaster.
+
+**A leak is accumulation, not presence.** One live arena renders forever by design; a leak
+means each visit leaves its loop behind, so N visits cost ~N×60fps. So the check hooks
+`requestAnimationFrame`, plays the bot through several scenes, and asserts the rate stays
+**flat** rather than zero — plus never more than one canvas, nothing animating before a
+run starts, and no console errors.
+
+It needs any Chromium-based browser already on the machine and **skips rather than fails**
+if there isn't one, so it can never block someone who just wants to run the tests. Point
+it somewhere specific with `PUZZLESTUDIO_BROWSER=/path/to/chrome`.
+
 ---
 
 ## How to add engine #21
