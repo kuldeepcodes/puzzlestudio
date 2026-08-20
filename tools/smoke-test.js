@@ -435,12 +435,33 @@ note(`director reasons: ${Object.entries(reasonHits).sort((a, b) => b[1] - a[1])
 // `override:blackout` is deliberately not required here: now that the bot
 // rests sensibly it never dies in a normal run, which is correct behaviour.
 // It has its own constructed test in §5.
+//
+// FLOORED, because this assertion is soak-length-fragile in a way its wording
+// hides. It reads as "this branch is alive" but actually says "this branch is
+// alive at this many transitions". The rare branches run 2-10 per 1000 across
+// seeds, so a 200-transition run fails on `forced-door` with nothing wrong —
+// and PZ_TRANSITIONS is a documented knob people turn down to iterate. A suite
+// that goes red for no reason is a suite people learn to ignore.
+//
+// Below the floor it still PRINTS what it never saw, so the signal survives
+// without the false red. Detection is not weakened: §6 tests the same four
+// branches by construction, and a genuinely broken branch is caught there at
+// any transition count. Verified by breaking `pick_lock`'s guard for real —
+// caught at 1000 by this check, and at 200 by §6.
 {
+  const LIVENESS_FLOOR = 1000;
   const wantAlive = ['override:light-critical', 'override:water-fail',
                      'override:forced-door', 'override:picked-lock'];
   const dead = wantAlive.filter(r => !(reasonHits[r] > 0));
-  ok(dead.length === 0, 'every override branch actually fires during normal play',
-    dead.length ? `never fired across ${TRANSITIONS} transitions: ${dead.join(', ')}` : '');
+  if (TRANSITIONS < LIVENESS_FLOOR) {
+    note(`override liveness not asserted below ${LIVENESS_FLOOR} transitions ` +
+      `(ran ${TRANSITIONS}${dead.length ? `; unseen: ${dead.join(', ')}` : ''})`);
+    ok(true, 'every override branch actually fires during normal play',
+      `skipped — needs PZ_TRANSITIONS >= ${LIVENESS_FLOOR}`);
+  } else {
+    ok(dead.length === 0, 'every override branch actually fires during normal play',
+      dead.length ? `never fired across ${TRANSITIONS} transitions: ${dead.join(', ')}` : '');
+  }
 }
 
 // A RELIEF key that no engine provides is a rule that can never apply. This is
