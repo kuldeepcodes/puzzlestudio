@@ -25,6 +25,14 @@
 
    THE BRANCH
      Knowing who did it is not the same as deciding what to do about it.
+
+   HOW YOU TOUCH IT
+     The statements are not handed to you. They are a roster board, a sign-in
+     sheet, a note somebody left on a desk — scattered across an office you
+     have to walk, one clue each. The grid stays a grid, on a terminal you
+     walk up to, because a logic grid genuinely is better as a grid and
+     spatialising the deduction itself would only wreck it. Finding the
+     statements is the search; crossing them off is still done sitting down.
    ========================================================================== */
 (function (root) {
   'use strict';
@@ -62,6 +70,22 @@
         between: 'badge-ins', betweenOne: 'badge-in'
       },
       prize: 'You lift the badge off the hook it has been on since the evacuation order.',
+      avatar: '\uD83E\uDDCD', deskIcon: '\uD83D\uDDA5\uFE0F', deskName: 'The duty terminal',
+      roomNote: 'The floor has been left exactly as it was. Every statement you get is something you found on it \u2014 go and read them, then work the grid at the terminal.',
+      sources: [
+        { icon: '\uD83D\uDCCB', name: 'roster board' },
+        { icon: '\u270D\uFE0F', name: 'sign-in sheet' },
+        { icon: '\uD83D\uDCDD', name: 'supervisor\u2019s note' },
+        { icon: '\uD83D\uDEAA', name: 'door log' },
+        { icon: '\uD83D\uDCFC', name: 'camera still' },
+        { icon: '\uD83D\uDCDF', name: 'radio log' },
+        { icon: '\uD83D\uDCC7', name: 'lanyard tray' },
+        { icon: '\uD83D\uDCD2', name: 'shift diary' },
+        { icon: '\uD83D\uDCC4', name: 'incident form' },
+        { icon: '\uD83D\uDCD3', name: 'visitor book' },
+        { icon: '\uD83D\uDD22', name: 'keypad log' },
+        { icon: '\uD83D\uDD16', name: 'locker tag' }
+      ],
       branchA: { id: 'code', icon: '\uD83D\uDD22', title: 'Badge in at the terminal', desc: 'Quiet, legitimate, logged. Somebody will read that log eventually.' },
       branchB: { id: 'force_door', icon: '\uD83D\uDD28', title: 'Use it on the bay shutter', desc: 'One badge, one shutter, and a great deal of noise on the way out.' }
     },
@@ -93,6 +117,22 @@
         between: 'trips', betweenOne: 'trip'
       },
       prize: 'They hand it over without meeting your eye, and the room decides very hard to look elsewhere.',
+      avatar: '\uD83E\uDDCD', deskIcon: '\uD83D\uDD6F\uFE0F', deskName: 'The long table',
+      roomNote: 'Everybody is asleep or pretending to be. What you know you will have to find lying around \u2014 collect it, then sit down at the table and work it out.',
+      sources: [
+        { icon: '\uD83D\uDCCB', name: 'watch rota' },
+        { icon: '\u270D\uFE0F', name: 'store ledger' },
+        { icon: '\uD83D\uDCDD', name: 'note on a bunk' },
+        { icon: '\uD83C\uDF5E', name: 'ration board' },
+        { icon: '\uD83D\uDECF\uFE0F', name: 'bunk chart' },
+        { icon: '\uD83D\uDD6F\uFE0F', name: 'burnt-down candle' },
+        { icon: '\uD83E\uDDF3', name: 'somebody\u2019s pack' },
+        { icon: '\uD83D\uDCD2', name: 'the day book' },
+        { icon: '\uD83E\uDDFA', name: 'the bin by the door' },
+        { icon: '\uD83D\uDC5F', name: 'wet bootprints' },
+        { icon: '\uD83D\uDD26', name: 'a torch left on' },
+        { icon: '\uD83E\uDDE3', name: 'a scarf on a hook' }
+      ],
       branchA: { id: 'trade', icon: '\uD83E\uDD1D', title: 'Ask for it back out loud', desc: 'In front of everyone, so it stays a thing that happened once.' },
       branchB: { id: 'rest', icon: '\uD83D\uDECF\uFE0F', title: 'Say nothing and sleep on it', desc: 'You know. They know you know. That is worth something in the morning.' }
     },
@@ -124,6 +164,22 @@
         between: 'sightings', betweenOne: 'sighting'
       },
       prize: 'The locker key is still on the manifest board, under a name you can now put a station to.',
+      avatar: '\uD83E\uDDCD', deskIcon: '\uD83D\uDDFA\uFE0F', deskName: 'The chart room',
+      roomNote: 'She is listing and nobody is aboard. Everything you learn is something you find on a bulkhead \u2014 gather it, then take it into the chart room.',
+      sources: [
+        { icon: '\uD83D\uDCCB', name: 'watch bill' },
+        { icon: '\u270D\uFE0F', name: 'deck log' },
+        { icon: '\uD83D\uDCDD', name: 'the mate\u2019s slate' },
+        { icon: '\uD83E\uDDED', name: 'muster list' },
+        { icon: '\uD83D\uDD14', name: 'bell book' },
+        { icon: '\uD83D\uDCFB', name: 'the radio pad' },
+        { icon: '\uD83E\uDDF7', name: 'a torn oilskin' },
+        { icon: '\uD83D\uDCD2', name: 'engine log' },
+        { icon: '\u2615', name: 'a cold mug' },
+        { icon: '\uD83E\uDDF0', name: 'an open toolbox' },
+        { icon: '\uD83D\uDEDF', name: 'the lifering rack' },
+        { icon: '\uD83D\uDD26', name: 'a dropped lamp' }
+      ],
       branchA: { id: 'descend', icon: '\uD83E\uDDD7', title: 'Go down to the flooded deck', desc: 'You know which hatch now, and roughly how long the air lasted.' },
       branchB: { id: 'signal', icon: '\uD83D\uDCE1', title: 'Raise the shore station', desc: 'Read the names out. Somebody on land has been waiting to hear them.' }
     }
@@ -283,6 +339,48 @@
 
   function gridSize(tier) {
     return 3 + Math.min(2, Math.floor((Math.max(1, tier) - 1) / 2));   // 3,3,4,4,5,5...
+  }
+
+  /* =============================================================== OFFICE = */
+  /* One clue, one place to find it. Desks sit on a lattice you can walk
+     between and the terminal is against the near wall. Derived entirely from
+     the clue count, so it needs no rng and always lays out the same. */
+
+  function officePlan(clueCount) {
+    var cols = Math.min(5, Math.max(2, Math.ceil(Math.sqrt(Math.max(1, clueCount)))));
+    var rows = Math.ceil(Math.max(1, clueCount) / cols);
+
+    var x0 = 5, y0 = 2;
+    var W = x0 + cols * 2 + 1;
+    var H = Math.max(9, y0 + rows * 2 + 2);
+
+    var tiles = [], x, y, row;
+    for (y = 0; y < H; y++) {
+      row = [];
+      for (x = 0; x < W; x++) row.push(x === 0 || y === 0 || x === W - 1 || y === H - 1 ? 1 : 0);
+      tiles.push(row);
+    }
+
+    var spots = [];
+    for (var i = 0; i < clueCount; i++) {
+      spots.push({ x: x0 + (i % cols) * 2, y: y0 + Math.floor(i / cols) * 2 });
+    }
+
+    // Partitions in the gaps between desks: isolated tiles two apart, so the
+    // floor is one connected piece by construction and nothing can be sealed in.
+    for (var ri = 0; ri + 1 < rows; ri++) {
+      for (var ci = 0; ci + 1 < cols; ci++) {
+        if ((ri + ci) % 2) continue;
+        var px = x0 + ci * 2 + 1, py = y0 + ri * 2 + 1;
+        if (px > 0 && py > 0 && px < W - 1 && py < H - 1) tiles[py][px] = 1;
+      }
+    }
+
+    return {
+      tiles: tiles, w: W, h: H, spots: spots,
+      spawn: { x: 2, y: H - 2 },
+      desk: { x: 2, y: Math.max(1, Math.floor(H / 2)) }
+    };
   }
 
   function buildPuzzle(n, rng, ctx) {
@@ -457,7 +555,13 @@
     '  background:rgba(226,105,95,.08);border:1px solid rgba(226,105,95,.28)}',
 
     '.pz-lgrid-shake{animation:pzLgridShake .42s var(--ease)}',
-    '@keyframes pzLgridShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}'
+    '@keyframes pzLgridShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}',
+
+    '.pz-lgrid-panel{display:flex;flex-direction:column;gap:14px}',
+    '.pz-lgrid-clue.is-missing{opacity:.5;cursor:default;border-style:dashed;color:var(--dim)}',
+    '.pz-lgrid-clue.is-missing:hover{border-color:var(--line-soft)}',
+    '.pz-lgrid-clue.is-missing em{font-style:normal;color:var(--warn)}',
+    '.pz-lgrid-redact{letter-spacing:.05em;color:var(--dimmer)}'
   ].join('\n');
 
   /* ================================================================ MOUNT = */
@@ -471,6 +575,30 @@
     var C = puzzle.content;
     var finished = false;
     var brokenClue = -1;
+
+    var arena = null;
+    var found = {};                // clue index -> you have physically read it
+    var sourceOf = [];             // clue index -> { icon, name }
+    var deskStation = null;
+    var hudClues = null, hudCommits = null, hudRead = null;
+
+    /** No arena, no legwork: the whole file is already on the desk. */
+    function hasClue(i) { return arena ? !!found[i] : true; }
+
+    function clueCount() {
+      var k = 0;
+      for (var i = 0; i < puzzle.clues.length; i++) if (hasClue(i)) k++;
+      return k;
+    }
+
+    var SOURCES = (C.sources && C.sources.length) ? C.sources : [{ icon: '\uD83D\uDCC4', name: 'a piece of paper' }];
+    for (var s0 = 0; s0 < puzzle.clues.length; s0++) {
+      var src = SOURCES[s0 % SOURCES.length];
+      sourceOf.push({
+        icon: src.icon,
+        name: src.name + (s0 >= SOURCES.length ? ' (' + (Math.floor(s0 / SOURCES.length) + 1) + ')' : '')
+      });
+    }
 
     var objCells = [], timeCells = [];
     var boards = h('div', { class: 'pz-lgrid-boards' });
@@ -582,7 +710,8 @@
       PS.ui.clear(metaBox);
       PS.ui.append(metaBox, [
         h('div', { class: 'pz-lgrid-meta' }, [h('span', { text: 'Grid' }), h('b', { text: n + ' \u00D7 ' + n + ' \u00D7 ' + n })]),
-        h('div', { class: 'pz-lgrid-meta' }, [h('span', { text: 'Statements' }), h('b', { text: String(puzzle.clues.length) })]),
+        h('div', { class: 'pz-lgrid-meta' + (arena && clueCount() < puzzle.clues.length ? ' is-hot' : '') },
+          [h('span', { text: 'Statements' }), h('b', { text: clueCount() + ' of ' + puzzle.clues.length })]),
         h('div', { class: 'pz-lgrid-meta' + (puzzle.attempts <= 1 ? ' is-hot' : '') },
           [h('span', { text: 'Commits left' }), h('b', { text: String(puzzle.attempts) })])
       ]);
@@ -594,15 +723,41 @@
       } else if (!finished && brokenClue >= 0) {
         warnBox.appendChild(h('div', { class: 'pz-lgrid-warn' },
           ['That reading contradicts statement ' + (brokenClue + 1) + '. Everything else may still be sound.']));
+      } else if (!finished && arena && clueCount() < puzzle.clues.length) {
+        warnBox.appendChild(h('div', { class: 'pz-lgrid-warn' },
+          [(puzzle.clues.length - clueCount()) + ' statement' + (puzzle.clues.length - clueCount() === 1 ? ' is' : 's are') +
+            ' still out there on the floor. Only the full set narrows this to one arrangement.']));
       }
 
       paintClues();
+      paintHud();
+    }
+
+    function paintHud() {
+      if (!arena) return;
+      var got = clueCount();
+      if (hudClues) hudClues.set(got + ' of ' + puzzle.clues.length, got < puzzle.clues.length ? 'warn' : 'good');
+      if (hudCommits) hudCommits.set(String(puzzle.attempts), puzzle.attempts <= 1 ? 'bad' : null);
+      if (hudRead) {
+        var ok = readGrid(puzzle.markObj) && readGrid(puzzle.markTime);
+        hudRead.set(ok ? 'clean' : 'incomplete', ok ? 'good' : null);
+      }
     }
 
     function paintClues() {
       PS.ui.clear(clueBox);
       for (var i = 0; i < puzzle.clues.length; i++) {
         (function (k) {
+          if (!hasClue(k)) {
+            clueBox.appendChild(h('div', { class: 'pz-lgrid-clue is-missing' }, [
+              h('span', { class: 'pz-lgrid-clue__n', text: String(k + 1) }),
+              h('span', {}, [
+                h('span', { class: 'pz-lgrid-redact', text: '\u2588\u2588\u2588\u2588 \u2588\u2588\u2588\u2588\u2588\u2588 \u2588\u2588\u2588 \u2588\u2588\u2588\u2588\u2588 ' }),
+                h('em', { text: '\u2014 ' + sourceOf[k].icon + ' ' + sourceOf[k].name + ', not read yet' })
+              ])
+            ]));
+            return;
+          }
           var cls = 'pz-lgrid-clue' + (puzzle.clueUsed[k] ? ' is-used' : '') + (brokenClue === k ? ' is-broken' : '');
           var row = h('div', { class: cls }, [
             h('span', { class: 'pz-lgrid-clue__n', text: String(k + 1) }),
@@ -632,18 +787,26 @@
 
       if (correct) { puzzle.solved = true; finished = true; renderWin(); return; }
 
-      // Name the first statement their reading actually breaks. Honest, useful,
-      // and it never leaks a cell they have not earned.
+      // Name the first statement their reading actually breaks — preferring one
+      // they have actually read, so the feedback points at something they hold.
       var inv = invert(ro);
       brokenClue = -1;
-      for (var i = 0; i < puzzle.clues.length; i++) {
+      var i;
+      for (i = 0; i < puzzle.clues.length; i++) {
+        if (!hasClue(i)) continue;
         if (!puzzle.clues[i].t(ro, inv, rt)) { brokenClue = i; break; }
+      }
+      if (brokenClue < 0) {
+        for (i = 0; i < puzzle.clues.length; i++) {
+          if (!puzzle.clues[i].t(ro, inv, rt)) { brokenClue = i; break; }
+        }
       }
 
       puzzle.attempts--;
       puzzle.wrong++;
       api.tweak({ health: -(3 + puzzle.tier * 2), morale: -5, energy: -3 });
       boards.classList.remove('pz-lgrid-shake'); void boards.offsetWidth; boards.classList.add('pz-lgrid-shake');
+      if (arena) { arena.hit('#e2695f'); arena.shake(6, 0.35); }
       api.toast(brokenClue >= 0
         ? 'Statement ' + (brokenClue + 1) + ' says otherwise.'
         : 'The names line up and the hours do not.', 'bad', 3800);
@@ -664,6 +827,7 @@
           ', at ' + ctx.slots[puzzle.timeOf[invert(puzzle.objOf)[puzzle.target]]] + '. ' + C.prize }),
         h('div', { class: 'pz-choices' }, [branch(C.branchA), branch(C.branchB)])
       ]);
+      if (deskStation) deskStation.solve();
       api.flash();
     }
 
@@ -735,6 +899,58 @@
       });
     }
 
+    /* ============================================================== WORLD == */
+    /* One clue, one place on the floor to find it. */
+
+    function readSource(i) {
+      if (finished || found[i]) return;
+      found[i] = true;
+      api.toast(sourceOf[i].icon + ' ' + cap(sourceOf[i].name) + ': ' + puzzle.clues[i].text, 'good', 5200);
+      if (deskStation) deskStation.pulse();
+      paint();
+    }
+
+    function buildWorld() {
+      var plan = officePlan(puzzle.clues.length);
+
+      arena = PS.arena.create(el, {
+        map: { w: plan.w, h: plan.h, tiles: plan.tiles },
+        spawn: plan.spawn,
+        avatar: C.avatar || '\uD83E\uDDCD',
+        light: state.stats.light
+      });
+      if (!arena) return false;
+      teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
+
+      hudClues = arena.chip('Statements', '\uD83D\uDCC4');
+      hudRead = arena.chip('Grid', '\uD83E\uDEAA');
+      hudCommits = arena.chip('Commits', '\u2714');
+
+      for (var i = 0; i < puzzle.clues.length; i++) addSource(i, plan.spots[i]);
+
+      deskStation = arena.station({
+        x: plan.desk.x, y: plan.desk.y, icon: C.deskIcon, label: C.deskName,
+        hint: 'work the grid here', radius: 1.45, emits: 2.2,
+        onEnter: function (panelEl) { PS.ui.append(panelEl, panelStack); },
+        onOpen: function () { paint(); }
+      });
+
+      arena.note(C.roomNote);
+      arena.button('\u21A9 Give up on it', giveUp, 'pz-btn--danger');
+      arena.focus();
+      return true;
+    }
+
+    function addSource(i, spot) {
+      if (!spot) return;
+      arena.prop({
+        x: spot.x, y: spot.y, icon: sourceOf[i].icon,
+        label: cap(sourceOf[i].name), hint: 'read it',
+        emits: 0.95, tint: '#6fb3e0',
+        onActivate: function () { readSource(i); }
+      });
+    }
+
     /* ------------------------------------------------------------- layout -- */
 
     submitBtn.addEventListener('click', submit);
@@ -761,39 +977,48 @@
       ]));
     }
 
-    PS.ui.append(el, h('div', { class: 'pz-lgrid' }, [
-      h('div', { class: 'pz-col' }, [
-        boards,
-        h('div', { class: 'pz-note' }, [
-          'Click a square to cycle ', h('strong', { text: 'blank \u2192 tick \u2192 cross' }),
-          '. A tick crosses out the rest of its row and column for you. ',
-          'You need every ', C.peopleWord, ' matched to one ', C.objWord, ' and one ', C.timeWord, '.'
-        ]),
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'What you have so far' }),
-          readBox
-        ]),
-        h('div', { class: 'pz-row' }, [submitBtn, clearBtn]),
-        endBox
-      ]),
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'Statements' }),
-          clueBox,
-          h('div', { class: 'pz-note', text: 'Click a statement to strike it once you have used it.' })
-        ]),
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'Who you are dealing with' }),
-          h('div', { class: 'pz-lgrid-read' }, whoList)
-        ]),
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'The case' }),
-          metaBox
-        ]),
-        warnBox,
-        walkBtn
-      ])
-    ]));
+    var howNote = h('div', { class: 'pz-note' }, [
+      'Click a square to cycle ', h('strong', { text: 'blank \u2192 tick \u2192 cross' }),
+      '. A tick crosses out the rest of its row and column for you. ',
+      'You need every ', C.peopleWord, ' matched to one ', C.objWord, ' and one ', C.timeWord, '.'
+    ]);
+    var readCard = h('div', { class: 'pz-card' }, [
+      h('div', { class: 'pz-card__head', text: 'What you have so far' }), readBox
+    ]);
+    var buttonRow = h('div', { class: 'pz-row' }, [submitBtn, clearBtn]);
+    var cluesCard = h('div', { class: 'pz-card' }, [
+      h('div', { class: 'pz-card__head', text: 'Statements' }),
+      clueBox,
+      h('div', { class: 'pz-note', text: 'Click a statement to strike it once you have used it.' })
+    ]);
+    var whoCard = h('div', { class: 'pz-card' }, [
+      h('div', { class: 'pz-card__head', text: 'Who you are dealing with' }),
+      h('div', { class: 'pz-lgrid-read' }, whoList)
+    ]);
+    var caseCard = h('div', { class: 'pz-card' }, [
+      h('div', { class: 'pz-card__head', text: 'The case' }), metaBox
+    ]);
+
+    /* Built once. The terminal hands these exact nodes back every time you walk
+       up to it, so a half-marked grid survives going out for one more clue. */
+    var panelStack = h('div', { class: 'pz-lgrid-panel' }, [
+      boards, howNote, readCard, buttonRow, endBox, cluesCard, whoCard, caseCard, warnBox
+    ]);
+
+    var arenaOk = false;
+    if (PS.arena && typeof PS.arena.create === 'function') {
+      try { arenaOk = buildWorld(); }
+      catch (e) { arenaOk = false; if (root.console) console.warn('[e08] arena failed, falling back', e); }
+    }
+
+    if (!arenaOk) {
+      /* Degraded mode: the original two-column case file, all statements known. */
+      arena = null;
+      PS.ui.append(el, h('div', { class: 'pz-lgrid' }, [
+        h('div', { class: 'pz-col' }, [boards, howNote, readCard, buttonRow, endBox]),
+        h('div', { class: 'pz-col' }, [cluesCard, whoCard, caseCard, warnBox, walkBtn])
+      ]));
+    }
 
     paint();
   }
