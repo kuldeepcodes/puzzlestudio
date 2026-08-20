@@ -198,6 +198,7 @@
       var r = dom.statRows[k];
       r.fill.style.width = v + '%';
       r.num.textContent = String(v);
+      r.row.setAttribute('data-level', v <= 0 ? 'crit' : v < 18 ? 'crit' : v < 38 ? 'low' : v >= 96 ? 'full' : 'ok');
       if (!silent && prevStats && prevStats[k] !== undefined && prevStats[k] !== v) {
         var d = v - prevStats[k];
         flashStat(r.row, d);
@@ -292,6 +293,10 @@
     row.classList.remove('is-up', 'is-down');
     void row.offsetWidth;                       // restart the animation
     row.classList.add(d > 0 ? 'is-up' : 'is-down');
+    // Arena scenes can drain a stat several times a second — replace the
+    // floating pill rather than stacking a dozen of them on top of each other.
+    var old = row.querySelector('.ps-delta');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
     var pill = h('span', { class: 'ps-delta ' + (d > 0 ? 'up' : 'down'), text: signed(d) });
     row.appendChild(pill);
     setTimeout(function () { if (pill.parentNode) pill.parentNode.removeChild(pill); }, 1500);
