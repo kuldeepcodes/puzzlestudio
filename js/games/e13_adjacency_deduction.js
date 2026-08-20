@@ -124,10 +124,22 @@
    * Rule 1 is the pair every player works out for themselves in ten seconds.
    * Rule 2 — the subset rule — is the one that turns a guess into a deduction,
    * and it is the reason a board can be dense and still be honest.
+   *
+   * A revealed cell is one you have already stood on, so it is safe by
+   * definition and is seeded as such here. That is not a convenience: any
+   * neighbour missing from `safe` is treated as UNKNOWN below, which inflates
+   * the unknown list and silently disables rule 1's "everything left must be a
+   * hazard" deduction. Seeding inside the function rather than at each call
+   * site means no caller can get this wrong — and a caller that already
+   * maintains the invariant loses nothing.
    */
   function propagate(n8, near, revealed, safe, haz) {
     var ids = [], k;
-    for (k in revealed) if (Object.prototype.hasOwnProperty.call(revealed, k)) ids.push(+k);
+    for (k in revealed) {
+      if (!Object.prototype.hasOwnProperty.call(revealed, k)) continue;
+      ids.push(+k);
+      safe[+k] = true;
+    }
 
     var changed = true, guard = 0;
     while (changed && guard++ < 80) {
@@ -805,8 +817,8 @@
     var C = puzzle.content;
     var w = puzzle.w;
     var safe = {}, haz = {}, k;
-    for (k in puzzle.revealed) if (Object.prototype.hasOwnProperty.call(puzzle.revealed, k)) safe[+k] = true;
 
+    // propagate() seeds the revealed cells into `safe` itself.
     propagate(puzzle.n8, puzzle.near, puzzle.revealed, safe, haz);
 
     var nb = puzzle.n4[puzzle.at], i, m;
