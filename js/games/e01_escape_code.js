@@ -284,36 +284,98 @@
     };
   }
 
+  /* ============================================================== ROOM ==
+     The room the puzzle happens in, as a place you can walk around. Derived
+     from the puzzle rather than the rng: the same seed lays the same room out
+     the same way, and build() keeps every draw it already made.             */
+
+  var ROOM_W = 21, ROOM_H = 13;
+
+  /** FNV-1a. Deterministic, cheap, and not Math.random — replays matter. */
+  function hashOf(str) {
+    var v = 2166136261, i;
+    str = String(str);
+    for (i = 0; i < str.length; i++) { v ^= str.charCodeAt(i); v = (v * 16777619) >>> 0; }
+    return v >>> 0;
+  }
+
+  /* Furniture. Every block sits inside x:[3,W-4] y:[2,H-3], which leaves the
+     one-tile ring against the walls permanently open — so nothing these can
+     do will ever cut the room in two or strand an object behind them. */
+  var BLOCKS = [
+    [4, 3, 3, 1], [13, 3, 2, 1], [7, 6, 2, 2], [15, 7, 3, 1],
+    [4, 9, 2, 1], [12, 9, 4, 1], [9, 2, 1, 2], [17, 4, 1, 3]
+  ];
+
+  function buildRoom(puzzle, skinId) {
+    var W = ROOM_W, H = ROOM_H, x, y, i;
+    var tiles = [];
+    for (y = 0; y < H; y++) {
+      var row = [];
+      for (x = 0; x < W; x++) row.push((x === 0 || y === 0 || x === W - 1 || y === H - 1) ? 1 : 0);
+      tiles.push(row);
+    }
+
+    var seed = hashOf(puzzle.code + '|' + skinId + '|' + puzzle.objects.length);
+    var doorY = (H - 1) >> 1;
+
+    var want = 4 + (seed % 3);
+    for (i = 0; i < BLOCKS.length && i < want; i++) {
+      var blk = BLOCKS[(i + (seed >>> 5)) % BLOCKS.length];
+      for (y = blk[1]; y < blk[1] + blk[3]; y++) {
+        for (x = blk[0]; x < blk[0] + blk[2]; x++) tiles[y][x] = 1;
+      }
+    }
+
+    var spawn = { x: 1, y: doorY };
+    var door  = { x: W - 1, y: doorY };
+    var pad   = { x: W - 2, y: doorY };
+
+    /* Anchors: the ring of floor against the walls. Objects stand on it, so
+       they read as pushed up against something and are always reachable. */
+    var ring = [];
+    for (x = 1; x <= W - 2; x++) ring.push([x, 1]);
+    for (y = 2; y <= H - 2; y++) ring.push([W - 2, y]);
+    for (x = W - 3; x >= 1; x--) ring.push([x, H - 2]);
+    for (y = H - 3; y >= 2; y--) ring.push([1, y]);
+
+    var free = [];
+    for (i = 0; i < ring.length; i++) {
+      var rx = ring[i][0], ry = ring[i][1];
+      if (rx === W - 2 && Math.abs(ry - doorY) <= 3) continue;      // the door end
+      if (rx === 1 && Math.abs(ry - doorY) <= 1) continue;          // where you start
+      free.push(ring[i]);
+    }
+
+    /* Spread the objects evenly round that ring, nudged by the seed so two
+       rooms with the same object count still do not look identical. */
+    var count = puzzle.objects.length;
+    var spots = [], taken = {};
+    for (i = 0; i < count; i++) {
+      var want2 = Math.round(i * free.length / Math.max(1, count)) +
+                  (hashOf(puzzle.objects[i].name) % 3) - 1;
+      for (var probe = 0; probe < free.length; probe++) {
+        var at = ((want2 + probe) % free.length + free.length) % free.length;
+        if (taken[at]) continue;
+        taken[at] = true;
+        spots.push({ x: free[at][0], y: free[at][1] });
+        break;
+      }
+    }
+
+    return {
+      w: W, h: H, tiles: tiles,
+      spawn: spawn, door: door, pad: pad,
+      pick:  { x: W - 2, y: doorY - 2 },
+      force: { x: W - 2, y: doorY + 2 },
+      spots: spots
+    };
+  }
+
   /* ================================================================ CSS == */
 
   var CSS = [
-    '.pz-esc{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(268px,.9fr);gap:18px;align-items:start}',
-    '@media (max-width:820px){.pz-esc{grid-template-columns:1fr}}',
-
-    '.pz-esc-room{display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:10px}',
-    '.pz-esc-obj{position:relative;display:flex;flex-direction:column;gap:6px;align-items:flex-start;',
-    '  padding:12px 12px 11px;text-align:left;border-radius:10px;border:1px solid var(--line);',
-    '  background:linear-gradient(180deg,var(--panel-2),#0d1117);color:var(--text);',
-    '  transition:transform .16s var(--ease),border-color .16s var(--ease),box-shadow .16s var(--ease)}',
-    '.pz-esc-obj:hover:not(:disabled){transform:translateY(-3px);border-color:var(--acc);box-shadow:0 12px 26px rgba(0,0,0,.45)}',
-    '.pz-esc-obj:disabled{cursor:default}',
-    '.pz-esc-obj__i{font-size:22px;line-height:1}',
-    '.pz-esc-obj__n{font-size:12px;font-weight:600}',
-    '.pz-esc-obj__r{font-size:11px;line-height:1.45;color:var(--dim)}',
-    '.pz-esc-obj.is-clue{border-color:var(--acc);background:linear-gradient(180deg,var(--acc-wash),#0d1117)}',
-    '.pz-esc-obj.is-clue .pz-esc-obj__r{color:var(--acc-2)}',
-    '.pz-esc-obj.is-item{border-color:#3f7d5c}',
-    '.pz-esc-obj.is-item .pz-esc-obj__r{color:var(--good)}',
-    '.pz-esc-obj.is-hazard{border-color:#7d3f3f}',
-    '.pz-esc-obj.is-hazard .pz-esc-obj__r{color:var(--bad)}',
-    '.pz-esc-obj.is-empty{opacity:.55}',
-    '.pz-esc-obj__cost{position:absolute;top:9px;right:10px;font-family:var(--font-mono);font-size:10px;color:var(--dimmer)}',
-
-    '.pz-esc-decor{display:flex;flex-wrap:wrap;gap:8px}',
-    '.pz-esc-decor__i{font-family:var(--font-mono);font-size:11px;padding:4px 9px;border-radius:99px;',
-    '  color:var(--text-2);background:#0c1016;border:1px solid var(--line-soft)}',
-    '.pz-esc-decor__i b{color:var(--acc-2)}',
-
+    /* --- the door panel: keypad, notes, and what is standing in the room --- */
     '.pz-esc-pad{display:flex;flex-direction:column;gap:12px}',
     '.pz-esc-slots{display:flex;gap:8px;justify-content:center}',
     '.pz-esc-slot{width:46px;height:58px;display:grid;place-items:center;font-family:var(--font-mono);',
@@ -326,7 +388,11 @@
     '  transition:transform .1s var(--ease),border-color .1s var(--ease)}',
     '.pz-esc-key:hover:not(:disabled){border-color:var(--acc);transform:translateY(-1px)}',
     '.pz-esc-key:active:not(:disabled){transform:scale(.95)}',
-    '.pz-esc-key--wide{grid-column:span 1}',
+
+    '.pz-esc-decor{display:flex;flex-wrap:wrap;gap:8px}',
+    '.pz-esc-decor__i{font-family:var(--font-mono);font-size:11px;padding:4px 9px;border-radius:99px;',
+    '  color:var(--text-2);background:#0c1016;border:1px solid var(--line-soft)}',
+    '.pz-esc-decor__i b{color:var(--acc-2)}',
 
     '.pz-esc-notes{display:flex;flex-direction:column;gap:7px;max-height:250px;overflow:auto}',
     '.pz-esc-note{font-size:12px;line-height:1.5;color:var(--text-2);padding:8px 10px;border-radius:7px;',
@@ -340,6 +406,15 @@
     '.pz-esc-shake{animation:pzEscShake .42s var(--ease)}',
     '@keyframes pzEscShake{0%,100%{transform:none}20%{transform:translateX(-8px)}40%{transform:translateX(7px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}',
 
+    /* --- degraded mode only: the room as a list, when there is no arena ---- */
+    '.pz-esc-room{display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:10px}',
+    '.pz-esc-obj{position:relative;display:flex;flex-direction:column;gap:6px;align-items:flex-start;',
+    '  padding:12px 12px 11px;text-align:left;border-radius:10px;border:1px solid var(--line);',
+    '  background:linear-gradient(180deg,var(--panel-2),#0d1117);color:var(--text)}',
+    '.pz-esc-obj:disabled{cursor:default;opacity:.6}',
+    '.pz-esc-obj__i{font-size:22px;line-height:1}',
+    '.pz-esc-obj__n{font-size:12px;font-weight:600}',
+    '.pz-esc-obj__r{font-size:11px;line-height:1.45;color:var(--dim)}',
     '.pz-esc-exits{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}'
   ].join('\n');
 
@@ -350,75 +425,24 @@
   function mount(el, state, api, puzzle, skin) {
     var h = PS.ui.h;
     var refs = {};
+    var arena = null;
+    var keypad = null;                 // the station handle at the door
+    var pickProp = null;
+    var finished = false;
 
-    /* ---------------------------------------------------------- the room -- */
-    var room = h('div', { class: 'pz-esc-room' });
+    var room = buildRoom(puzzle, skin.id);
 
-    function paint(obj, node) {
-      node.className = 'pz-esc-obj' + (obj.searched
-        ? (obj.kind === 'clue' ? ' is-clue' : obj.kind === 'item' ? ' is-item'
-          : obj.kind === 'hazard' ? ' is-hazard' : ' is-empty')
-        : '');
-      PS.ui.clear(node);
-      PS.ui.append(node, [
-        h('div', { class: 'pz-esc-obj__i', text: obj.icon }),
-        h('div', { class: 'pz-esc-obj__n', text: obj.name }),
-        obj.searched
-          ? h('div', { class: 'pz-esc-obj__r', text: resultText(obj) })
-          : h('div', { class: 'pz-esc-obj__r', text: 'Unsearched.' }),
-        obj.searched ? null : h('div', { class: 'pz-esc-obj__cost', text: '\u26A1' + puzzle.searchCost })
-      ]);
-      node.disabled = obj.searched;
-    }
+    /* ============================================================ THE DOOR =
+       Exactly the keypad this engine has always had. It is built once and the
+       arena re-attaches these same nodes every time you walk back to the door,
+       so a half-entered code survives you going off to search a cupboard. */
 
-    function resultText(obj) {
-      if (obj.kind === 'clue') return obj.payload.text;
-      if (obj.kind === 'item') return 'You pocket the ' + PS.state.itemInfo(obj.payload).name.toLowerCase() + '.';
-      if (obj.kind === 'hazard') return obj.payload;
-      return obj.payload;
-    }
-
-    puzzle.objects.forEach(function (obj) {
-      var node = h('button', { class: 'pz-esc-obj', type: 'button' });
-      node.addEventListener('click', function () { search(obj, node); });
-      paint(obj, node);
-      room.appendChild(node);
-    });
-
-    function search(obj, node) {
-      if (obj.searched) return;
-      obj.searched = true;
-      puzzle.searches++;
-
-      // Searching costs energy; when you have none it starts costing you blood.
-      if (state.stats.energy >= puzzle.searchCost) api.tweak({ energy: -puzzle.searchCost });
-      else api.tweak({ energy: -state.stats.energy, health: -Math.ceil(puzzle.searchCost / 2) });
-
-      if (obj.kind === 'clue') {
-        puzzle.found.push(obj.payload);
-        api.toast('Found something: ' + ordinal(obj.payload.pos + 1) + ' digit.', 'good');
-      } else if (obj.kind === 'item') {
-        puzzle.picked.push(obj.payload);
-        api.tweak(null, [obj.payload]);
-        api.toast('Picked up ' + PS.state.itemInfo(obj.payload).name + '.', 'good');
-      } else if (obj.kind === 'hazard') {
-        api.tweak({ health: -(3 + puzzle.tier), morale: -2 });
-        api.toast('That hurt.', 'bad');
-      }
-
-      paint(obj, node);
-      renderNotes();
-      refreshExits();
-    }
-
-    /* ------------------------------------------------------------- decor -- */
     var decorRow = h('div', { class: 'pz-esc-decor' }, puzzle.decor.map(function (d) {
       return h('span', { class: 'pz-esc-decor__i' }, [
         h('b', { text: String(d.count) }), ' ', d.count === 1 ? d.one : d.many
       ]);
     }));
 
-    /* ------------------------------------------------------------ keypad -- */
     var slots = [0, 1, 2, 3].map(function () { return h('div', { class: 'pz-esc-slot', text: '\u2013' }); });
     var slotRow = h('div', { class: 'pz-esc-slots' }, slots);
 
@@ -432,23 +456,23 @@
         slots[i].className = 'pz-esc-slot' + (v === undefined ? '' : ' is-set');
       }
       for (i = 0; i < 3; i++) alarmDots[i].className = i < puzzle.attempts ? 'on' : '';
-      refs.submit.disabled = puzzle.keypadLocked || puzzle.entry.length < 4;
-      for (i = 0; i < refs.keys.length; i++) refs.keys[i].disabled = puzzle.keypadLocked;
-      refs.back.disabled = puzzle.keypadLocked || !puzzle.entry.length;
+      refs.submit.disabled = finished || puzzle.keypadLocked || puzzle.entry.length < 4;
+      for (i = 0; i < refs.keys.length; i++) refs.keys[i].disabled = finished || puzzle.keypadLocked;
+      refs.back.disabled = finished || puzzle.keypadLocked || !puzzle.entry.length;
     }
 
     function pressDigit(d) {
-      if (puzzle.keypadLocked || puzzle.entry.length >= 4) return;
+      if (finished || puzzle.keypadLocked || puzzle.entry.length >= 4) return;
       puzzle.entry.push(d);
       paintSlots();
     }
     function pressBack() {
-      if (puzzle.keypadLocked) return;
+      if (finished || puzzle.keypadLocked) return;
       puzzle.entry.pop();
       paintSlots();
     }
     function submit() {
-      if (puzzle.keypadLocked || puzzle.entry.length < 4) return;
+      if (finished || puzzle.keypadLocked || puzzle.entry.length < 4) return;
       var guess = puzzle.entry.join('');
       if (guess === puzzle.code) return escapeByCode();
 
@@ -458,6 +482,7 @@
       refs.pad.classList.remove('pz-esc-shake');
       void refs.pad.offsetWidth;
       refs.pad.classList.add('pz-esc-shake');
+      if (arena) arena.shake(6, 0.3);
 
       if (puzzle.attempts >= puzzle.maxAttempts) {
         puzzle.keypadLocked = true;
@@ -466,7 +491,7 @@
         api.toast('Wrong. ' + (puzzle.maxAttempts - puzzle.attempts) + ' left before it locks.', 'bad');
       }
       paintSlots();
-      refreshExits();
+      paintHud();
     }
 
     refs.keys = [];
@@ -487,21 +512,22 @@
     PS.ui.append(keyGrid, [refs.back, zero, refs.submit]);
 
     function onKey(ev) {
+      if (finished || ev.ctrlKey || ev.metaKey || ev.altKey) return;
       if (ev.key >= '0' && ev.key <= '9') { pressDigit(Number(ev.key)); ev.preventDefault(); }
       else if (ev.key === 'Backspace') { pressBack(); ev.preventDefault(); }
-      else if (ev.key === 'Enter') { submit(); ev.preventDefault(); }
+      // Enter is the arena's own "use this" key; only claim it when there is no arena.
+      else if (ev.key === 'Enter' && !arena) { submit(); ev.preventDefault(); }
     }
     document.addEventListener('keydown', onKey);
     teardownFns.push(function () { document.removeEventListener('keydown', onKey); });
 
     refs.pad = h('div', { class: 'pz-esc-pad' }, [slotRow, keyGrid, alarmRow]);
 
-    /* ------------------------------------------------------------- notes -- */
     var notes = h('div', { class: 'pz-esc-notes' });
     function renderNotes() {
       PS.ui.clear(notes);
       if (!puzzle.found.length) {
-        notes.appendChild(h('div', { class: 'pz-esc-note pz-esc-note--none', text: 'Nothing written down yet. Search the room.' }));
+        notes.appendChild(h('div', { class: 'pz-esc-note pz-esc-note--none', text: 'Nothing written down yet. Go and turn the room over.' }));
         return;
       }
       var sorted = puzzle.found.slice().sort(function (a, b) { return a.pos - b.pos; });
@@ -509,8 +535,77 @@
     }
     renderNotes();
 
-    /* ------------------------------------------------------------- exits -- */
-    var exits = h('div', { class: 'pz-esc-exits' });
+    /** The whole door panel. One set of nodes, wherever it is being shown. */
+    function doorPanel(host) {
+      PS.ui.append(host, [
+        h('div', { class: 'pz-card' }, [
+          h('div', { class: 'pz-card__head', text: 'Door keypad \u00B7 4 digits' }),
+          refs.pad
+        ]),
+        h('div', { class: 'pz-card' }, [
+          h('div', { class: 'pz-card__head', text: 'What you have written down' }),
+          notes
+        ]),
+        h('div', { class: 'pz-card' }, [
+          h('div', { class: 'pz-card__head', text: 'What is standing in this room' }),
+          decorRow
+        ]),
+        h('div', { class: 'pz-note' }, [
+          'Searching costs ', h('strong', { text: '\u26A1' + puzzle.searchCost }),
+          '. Three wrong codes and the panel locks for good.'
+        ])
+      ]);
+      paintSlots();
+    }
+
+    /* ============================================================ SEARCHING */
+
+    function resultText(obj) {
+      if (obj.kind === 'clue') return obj.payload.text;
+      if (obj.kind === 'item') return 'You pocket the ' + PS.state.itemInfo(obj.payload).name.toLowerCase() + '.';
+      return obj.payload;
+    }
+
+    function search(obj, handle) {
+      if (obj.searched || finished) return;
+      obj.searched = true;
+      puzzle.searches++;
+
+      // Searching costs energy; when you have none it starts costing you blood.
+      if (state.stats.energy >= puzzle.searchCost) api.tweak({ energy: -puzzle.searchCost });
+      else api.tweak({ energy: -state.stats.energy, health: -Math.ceil(puzzle.searchCost / 2) });
+
+      var line = resultText(obj);
+
+      if (obj.kind === 'clue') {
+        puzzle.found.push(obj.payload);
+        api.toast(line, 'good', 5600);
+        if (arena) { arena.ping(obj.at.x, obj.at.y); arena.dust(obj.at.x, obj.at.y, 8); }
+      } else if (obj.kind === 'item') {
+        puzzle.picked.push(obj.payload);
+        api.tweak(null, [obj.payload]);
+        api.toast('Picked up ' + PS.state.itemInfo(obj.payload).name + '.', 'good');
+        if (arena) arena.ping(obj.at.x, obj.at.y, '#6fbf8b');
+      } else if (obj.kind === 'hazard') {
+        api.tweak({ health: -(3 + puzzle.tier), morale: -2 });
+        api.toast(line, 'bad', 4200);
+        if (arena) { arena.hit('#e2695f'); arena.dust(obj.at.x, obj.at.y, 10, '#e2695f'); }
+      } else {
+        api.toast(line, null, 3200);
+      }
+
+      if (handle) {
+        handle.solve();
+        handle.setLabel(obj.name);
+        handle.raw.hint = obj.kind === 'clue' ? 'you wrote this one down' : 'searched';
+      }
+      renderNotes();
+      refreshDoorProps();
+      paintHud();
+      if (refs.fallbackRepaint) refs.fallbackRepaint();
+    }
+
+    /* ============================================================== EXITS = */
 
     function pickTool() {
       if (state.has('wire')) return 'wire';
@@ -518,40 +613,20 @@
       return null;
     }
 
-    function refreshExits() {
-      PS.ui.clear(exits);
+    function tryPick() {
+      if (finished) return;
       var tool = pickTool();
-
-      exits.appendChild(h('button', {
-        class: 'pz-choice', type: 'button', disabled: !tool,
-        onclick: function () { escapeByPick(tool); }
-      }, [
-        h('div', { class: 'pz-choice__i', text: '\uD83E\uDDF7' }),
-        h('div', { class: 'pz-choice__t', text: 'Pick the lock' }),
-        h('div', {
-          class: 'pz-choice__d',
-          text: tool
-            ? 'Slow and silent. Bends your ' + PS.state.itemInfo(tool).name.toLowerCase() + ' out of shape for good.'
-            : 'You need a wire or a pin. There is neither in your hands.'
-        }),
-        h('div', { class: 'pz-choice__tag', text: tool ? '\u26A1-' + (6 + puzzle.tier * 2) + '  quiet' : 'unavailable' })
-      ]));
-
-      exits.appendChild(h('button', {
-        class: 'pz-choice', type: 'button',
-        onclick: escapeByForce
-      }, [
-        h('div', { class: 'pz-choice__i', text: '\uD83D\uDCA5' }),
-        h('div', { class: 'pz-choice__t', text: 'Force the door' }),
-        h('div', { class: 'pz-choice__d', text: 'Always an option. It will hear you do it, and so will everything else.' }),
-        h('div', { class: 'pz-choice__tag', text: '\u2764\uFE0F-' + puzzle.forceDamage + '  loud' })
-      ]));
+      if (!tool) {
+        api.toast('You need a wire or a pin, and there is neither in your hands.', 'bad', 3200);
+        return;
+      }
+      escapeByPick(tool);
     }
-    refreshExits();
-
-    /* ------------------------------------------------------------ finish -- */
 
     function escapeByCode() {
+      if (finished) return;
+      finished = true;
+      if (keypad) keypad.solve();
       var thorough = puzzle.searches >= puzzle.objects.length - 1;
       api.flash();
       api.finish({
@@ -566,7 +641,8 @@
     }
 
     function escapeByPick(tool) {
-      if (!tool) return;
+      if (finished || !tool) return;
+      finished = true;
       var ok = api.rng.chance(puzzle.pickChance) || state.hasTag('has_tools');
       api.finish({
         outcome: ok ? 'success' : 'partial',
@@ -583,7 +659,10 @@
     }
 
     function escapeByForce() {
+      if (finished) return;
+      finished = true;
       api.flash();
+      if (arena) { arena.hit('#e2695f'); arena.shake(11, 0.5); }
       api.finish({
         outcome: 'partial',
         stats: { health: -puzzle.forceDamage, energy: -12, morale: -2 },
@@ -595,36 +674,183 @@
       });
     }
 
-    /* ------------------------------------------------------------ layout -- */
-    PS.ui.append(el, h('div', { class: 'pz-esc' }, [
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'The room' }),
-          decorRow
-        ]),
-        room,
+    /* ------------------------------------------------------- degraded mode --
+       arena.js is core and always present in index.html, but never let a
+       missing layer strand the player in a room with no way out of it.      */
+
+    if (!PS.arena || typeof PS.arena.create !== 'function') return renderFlat();
+
+    /* ============================================================== ARENA = */
+
+    var host = h('div', {});
+    PS.ui.append(el, host);
+
+    arena = PS.arena.create(host, {
+      map: { w: room.w, h: room.h, tiles: room.tiles },
+      spawn: room.spawn,
+      light: state.stats.light,
+      avatar: '\uD83E\uDDCD',
+      darkness: 0.95
+    });
+    if (!arena) return renderFlat();
+    teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
+
+    var mLight = arena.meter('Light', '\uD83D\uDD26');
+    var mEnergy = arena.meter('Energy', '\u26A1');
+    var cClues = arena.chip('Clues', '\uD83D\uDD22');
+    var cSearched = arena.chip('Turned over', '\uD83D\uDD0E');
+    var cAlarm = arena.chip('Wrong codes', '\uD83D\uDEA8');
+
+    arena.note('The door is on the far wall. Everything in here opens, and everything you open costs you.');
+
+    /* --- the things in the room ------------------------------------------ */
+
+    for (var oi = 0; oi < puzzle.objects.length; oi++) {
+      (function (obj, at) {
+        if (!at) return;
+        obj.at = at;
+        var handle = arena.prop({
+          x: at.x, y: at.y,
+          icon: obj.icon,
+          label: obj.name,
+          hint: 'E \u00B7 search \u26A1' + puzzle.searchCost,
+          trigger: 'press',
+          once: false,
+          radius: 1.0,
+          emits: 0.45,
+          onActivate: function () { search(obj, handle); }
+        });
+        if (obj.searched) { handle.solve(); handle.raw.hint = 'searched'; }
+      })(puzzle.objects[oi], room.spots[oi]);
+    }
+
+    /* --- the door -------------------------------------------------------- */
+
+    keypad = arena.station({
+      x: room.pad.x, y: room.pad.y,
+      icon: '\uD83D\uDEAA', label: 'The locked door',
+      hint: 'four-digit keypad',
+      radius: 1.4, emits: 2.1,
+      onEnter: function (panelEl) { doorPanel(panelEl); }
+    });
+
+    pickProp = arena.prop({
+      x: room.pick.x, y: room.pick.y,
+      icon: '\uD83E\uDDF7', label: 'Pick the lock',
+      hint: 'E \u00B7 needs a wire or a pin',
+      trigger: 'press', once: false, radius: 0.9, emits: 0.5,
+      onActivate: tryPick
+    });
+
+    arena.prop({
+      x: room.force.x, y: room.force.y,
+      icon: '\uD83D\uDCA5', label: 'Force the door',
+      hint: 'E \u00B7 \u2764\uFE0F-' + puzzle.forceDamage + ' and loud',
+      trigger: 'press', once: false, radius: 0.9, emits: 0.5, tint: '#e2695f',
+      onActivate: escapeByForce
+    });
+
+    function refreshDoorProps() {
+      if (!pickProp) return;
+      var tool = pickTool();
+      pickProp.raw.hint = tool
+        ? 'E \u00B7 bends your ' + PS.state.itemInfo(tool).name.toLowerCase() + ' for good'
+        : 'E \u00B7 needs a wire or a pin';
+      pickProp.raw.tint = tool ? null : '#7d8593';
+      // Turning up a wire two rooms into the search re-opens a door you had
+      // already tried and been refused at, so say so and light it again.
+      if (tool && pickProp.raw.done) {
+        pickProp.raw.done = false;
+        pickProp.pulse();
+        api.toast('The ' + PS.state.itemInfo(tool).name.toLowerCase() + ' would turn that lock.', 'good', 3600);
+      }
+    }
+
+    function paintHud() {
+      if (!arena || finished) return;
+      var e = state.stats.energy;
+      var lv = state.stats.light;
+      mLight.set(lv, lv + ' / 100', lv < 25 ? 'warn' : null);
+      mEnergy.set(e, e + ' / 100', e <= 0 ? 'bad' : (e < puzzle.searchCost * 2 ? 'warn' : null));
+      cClues.set(puzzle.found.length + ' / 4', puzzle.found.length === 4 ? null : 'warn');
+      cSearched.set(puzzle.searches + ' / ' + puzzle.objects.length);
+      cAlarm.set(puzzle.attempts + ' / ' + puzzle.maxAttempts, puzzle.keypadLocked ? 'bad' : (puzzle.attempts ? 'warn' : null));
+    }
+
+    refreshDoorProps();
+    paintHud();
+    arena.focus();
+
+    /* ------------------------------------------------------------ flat UI --
+       No canvas layer: the room becomes the list it used to be, so every one
+       of the three ways out is still reachable.                             */
+
+    function renderFlat() {
+      var grid = h('div', { class: 'pz-esc-room' });
+      var exits = h('div', { class: 'pz-esc-exits' });
+
+      function paintObj(obj, node) {
+        PS.ui.clear(node);
+        PS.ui.append(node, [
+          h('div', { class: 'pz-esc-obj__i', text: obj.icon }),
+          h('div', { class: 'pz-esc-obj__n', text: obj.name }),
+          h('div', { class: 'pz-esc-obj__r', text: obj.searched ? resultText(obj) : 'Unsearched. \u26A1' + puzzle.searchCost })
+        ]);
+        node.disabled = obj.searched || finished;
+      }
+
+      var nodes = puzzle.objects.map(function (obj) {
+        var node = h('button', { class: 'pz-esc-obj', type: 'button' });
+        node.addEventListener('click', function () { search(obj, null); });
+        paintObj(obj, node);
+        grid.appendChild(node);
+        return { obj: obj, node: node };
+      });
+
+      function paintExits() {
+        PS.ui.clear(exits);
+        var tool = pickTool();
+        exits.appendChild(h('button', {
+          class: 'pz-choice', type: 'button', disabled: !tool || finished,
+          onclick: function () { escapeByPick(tool); }
+        }, [
+          h('div', { class: 'pz-choice__i', text: '\uD83E\uDDF7' }),
+          h('div', { class: 'pz-choice__t', text: 'Pick the lock' }),
+          h('div', { class: 'pz-choice__d', text: tool
+            ? 'Slow and silent. Bends your ' + PS.state.itemInfo(tool).name.toLowerCase() + ' out of shape for good.'
+            : 'You need a wire or a pin. There is neither in your hands.' })
+        ]));
+        exits.appendChild(h('button', {
+          class: 'pz-choice', type: 'button', disabled: finished, onclick: escapeByForce
+        }, [
+          h('div', { class: 'pz-choice__i', text: '\uD83D\uDCA5' }),
+          h('div', { class: 'pz-choice__t', text: 'Force the door' }),
+          h('div', { class: 'pz-choice__d', text: 'Always an option. It will hear you do it, and so will everything else.' })
+        ]));
+      }
+
+      refs.fallbackRepaint = function () {
+        for (var i = 0; i < nodes.length; i++) paintObj(nodes[i].obj, nodes[i].node);
+        paintExits();
+      };
+      paintExits();
+
+      var col = h('div', { class: 'pz-col' });
+      doorPanel(col);
+
+      PS.ui.append(el, h('div', { class: 'pz-col' }, [
+        h('div', { class: 'pz-note', text: 'A locked room, and everything in it opens.' }),
+        grid,
         h('div', { class: 'pz-card' }, [
           h('div', { class: 'pz-card__head', text: 'Other ways out' }),
           exits
-        ])
-      ]),
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'Door keypad \u00B7 4 digits' }),
-          refs.pad
         ]),
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'What you have written down' }),
-          notes
-        ]),
-        h('div', { class: 'pz-note' }, [
-          'Searching costs ', h('strong', { text: '\u26A1' + puzzle.searchCost }),
-          '. Three wrong codes and the panel locks for good.'
-        ])
-      ])
-    ]));
+        col
+      ]));
+    }
 
-    paintSlots();
+    /* Nothing below the arena branch: renderFlat() only runs on the early
+       returns above, and paintHud() is the last word for the arena path. */
   }
 
   function unmount() {

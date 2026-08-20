@@ -32,6 +32,15 @@
      allocation and barter scenes for the rest of the run. It is deliberately
      NOT set through `tags`: CONTRACT.md reserves the derived tags for core,
      and deriveTags() would strip it back off anyway the moment the ally left.
+
+   HOW YOU TOUCH IT
+     The room is a room. The feed is at one end and the key is at the other,
+     and the set in the middle will not give you either of them — walk to
+     the feed to pull the signal in, walk to the book to get the key, then
+     work it at the set. The decode surfaces themselves are exactly the ones
+     they always were, because a shift dial and a mapping pad are already
+     the right shape and dragging them out into the world would only make
+     them worse.
    ========================================================================== */
 (function (root) {
   'use strict';
@@ -53,6 +62,13 @@
   var CONTENT = {
     radio_tower: {
       source: 'the set', sourceIcon: '\uD83D\uDCFB',
+      avatar: '\uD83E\uDDCD',
+      srcIcon: '\uD83D\uDCE1', srcName: 'The aerial lead', srcHint: 'put the feed back on',
+      srcLine: 'You throw the lead back onto the terminal and the set floods with carrier.',
+      keyIcon: '\uD83D\uDCD4', keyName: 'The operator\u2019s log', keyHint: 'take the settings page',
+      keyLine: 'The last legible page of the log is a settings table. It is enough to work with.',
+      setIcon: '\uD83D\uDCFB', setName: 'The set',
+      roomNote: 'The hut is dark. The aerial terminal is at one end, the log book at the other, and the set in the middle is no use without both.',
       channel: '121.5 repeating, weak, and somebody keeps keying it.',
       caller: 'a maintenance crew three valleys over',
       answerTitle: 'Key the mic',
@@ -74,6 +90,13 @@
 
     scratched_journal: {
       source: 'the journal', sourceIcon: '\uD83D\uDCD3',
+      avatar: '\uD83E\uDDCD',
+      srcIcon: '\uD83D\uDCC4', srcName: 'The loose last pages', srcHint: 'work them free',
+      srcLine: 'You work the last two pages out of the binding and flatten them on the boards.',
+      keyIcon: '\uD83D\uDD16', keyName: 'The card in the spine', keyHint: 'take the card',
+      keyLine: 'A stiff ruled card was pushed down into the spine. Whoever kept this book kept the key inside it.',
+      setIcon: '\uD83D\uDD6F\uFE0F', setName: 'The reading desk',
+      roomNote: 'Somebody has been through this room already. The pages are one side of it, the key is the other, and you read at the desk.',
       channel: 'Pencil, pressed hard, in a hand that was in a hurry.',
       caller: 'whoever was keeping this book',
       answerTitle: 'Go where it says',
@@ -95,6 +118,13 @@
 
     buoy_morse: {
       source: 'the buoy', sourceIcon: '\uD83D\uDEA2',
+      avatar: '\uD83E\uDDCD',
+      srcIcon: '\uD83D\uDD2D', srcName: 'The watch glass', srcHint: 'get the glass on it',
+      srcLine: 'You get the glass on the light and the blinking resolves into groups.',
+      keyIcon: '\uD83D\uDCCB', keyName: 'The signal card', keyHint: 'unclip the card',
+      keyLine: 'A laminated signal card, still clipped to the rail. Every symbol on it, in order.',
+      setIcon: '\uD83D\uDD26', setName: 'The watch post',
+      roomNote: 'The light is out on the water. You need the glass to read the cycle and the card to read the symbols, and the post is where you write it down.',
       channel: 'A light on the water, blinking on a cycle, going nowhere.',
       caller: 'a boat that is still afloat somewhere off the point',
       answerTitle: 'Answer with the torch',
@@ -289,6 +319,76 @@
 
   function isRight(puzzle) { return reading(puzzle) === puzzle.plain; }
 
+  /* ================================================================ ROOM == */
+  /* A hut with the feed at one end and the key at the other. Authored, not
+     generated — this scene is about two errands and a desk, not a maze. The
+     flood fill afterwards is a seatbelt: anything the player cannot reach is
+     sealed, and if a marker ends up walled off we fall back to an open room. */
+
+  var ROOM = [
+    '#####################',
+    '#...................#',
+    '#...1...........2...#',
+    '#...................#',
+    '#..####.....####....#',
+    '#...................#',
+    '#....#..#####..#....#',
+    '#....#.........#....#',
+    '#..####.....####....#',
+    '#...................#',
+    '#...0..........3....#',
+    '#...................#',
+    '#####################'
+  ];
+
+  function parseRoom() {
+    var tiles = [], marks = {}, y, x, ch, row;
+    for (y = 0; y < ROOM.length; y++) {
+      row = [];
+      for (x = 0; x < ROOM[y].length; x++) {
+        ch = ROOM[y].charAt(x);
+        row.push(ch === '#' ? 1 : 0);
+        if (ch >= '0' && ch <= '9') marks[ch] = { x: x, y: y };
+      }
+      tiles.push(row);
+    }
+
+    var W = tiles[0].length, H = tiles.length;
+    var start = marks['0'] || { x: 1, y: 1 };
+
+    // Flood from the spawn; seal any pocket nobody can walk into.
+    var seen = {}, q = [[start.x, start.y]], head = 0;
+    var D = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+    seen[start.x + ',' + start.y] = 1;
+    while (head < q.length) {
+      var c = q[head++];
+      for (var i = 0; i < 4; i++) {
+        var nx = c[0] + D[i][0], ny = c[1] + D[i][1];
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H || tiles[ny][nx]) continue;
+        var k = nx + ',' + ny;
+        if (seen[k]) continue;
+        seen[k] = 1; q.push([nx, ny]);
+      }
+    }
+
+    var stranded = false;
+    for (var m in marks) {
+      if (!Object.prototype.hasOwnProperty.call(marks, m)) continue;
+      if (!seen[marks[m].x + ',' + marks[m].y]) stranded = true;
+    }
+    if (stranded) {
+      for (y = 0; y < H; y++) {
+        for (x = 0; x < W; x++) tiles[y][x] = (x === 0 || y === 0 || x === W - 1 || y === H - 1) ? 1 : 0;
+      }
+      return { tiles: tiles, w: W, h: H, marks: marks };
+    }
+
+    for (y = 0; y < H; y++) {
+      for (x = 0; x < W; x++) if (!tiles[y][x] && !seen[x + ',' + y]) tiles[y][x] = 1;
+    }
+    return { tiles: tiles, w: W, h: H, marks: marks };
+  }
+
   /* ================================================================ CSS == */
 
   var CSS = [
@@ -345,7 +445,13 @@
 
     '.pz-ciph-note{font-size:12px;color:var(--dim);line-height:1.55}',
     '.pz-ciph-bad{font-size:12px;line-height:1.5;color:var(--bad);padding:8px 10px;border-radius:7px;',
-    '  background:rgba(226,105,95,.08);border:1px solid rgba(226,105,95,.28)}'
+    '  background:rgba(226,105,95,.08);border:1px solid rgba(226,105,95,.28)}',
+
+    '.pz-ciph-locked{font-size:12px;line-height:1.6;color:var(--warn);padding:10px 12px;border-radius:8px;',
+    '  background:rgba(230,180,85,.07);border:1px dashed rgba(230,180,85,.32)}',
+    '.pz-ciph-locked b{color:var(--text-2);font-weight:600}',
+    '.pz-ciph-static{font-family:var(--font-mono);font-size:clamp(12px,2.1vw,15px);letter-spacing:.16em;',
+    '  color:var(--dimmer);line-height:1.9;word-break:break-word;opacity:.55}'
   ].join('\n');
 
   /* ================================================================ MOUNT = */
@@ -357,17 +463,39 @@
     var C = puzzle.content;
     var finished = false;
 
+    var arena = null;
+    var haveSignal = false;        // walked to the feed
+    var haveKey = false;           // walked to the book
+    var setStation = null;
+    var hudSignal = null, hudKey = null, hudReads = null;
+
+    /** No arena, no errands: everything is already in front of you. */
+    function gotSignal() { return arena ? haveSignal : true; }
+    function gotKey() { return arena ? haveKey : true; }
+
     var interceptBox = h('div', { class: 'pz-ciph-intercept' });
     var outBox   = h('div', { class: 'pz-ciph-out' });
     var toolBox  = h('div', { class: 'pz-col' });
     var noteBox  = h('div', {});
     var actions  = h('div', { class: 'pz-col' });
 
+    var confirmBtn = h('button', { class: 'pz-btn pz-btn--primary', type: 'button' },
+      ['\u2713 That is what it says']);
+    var giveUpBtn = h('button', { class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button' },
+      ['\u21A9 Give up on it']);
+
     /* --------------------------------------------------------- the output */
 
     function paintOut() {
-      var txt = reading(puzzle);
       PS.ui.clear(outBox);
+      if (!gotSignal()) {
+        outBox.className = 'pz-ciph-out';
+        outBox.appendChild(h('span', { class: 'un', text: '\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7\u00B7' }));
+        PS.ui.clear(noteBox);
+        return;
+      }
+
+      var txt = reading(puzzle);
       for (var i = 0; i < txt.length; i++) {
         var ch = txt.charAt(i);
         if (ch === '\u00B7') outBox.appendChild(h('span', { class: 'un', text: '\u00B7' }));
@@ -387,6 +515,11 @@
 
     function paintIntercept() {
       PS.ui.clear(interceptBox);
+      if (!gotSignal()) {
+        interceptBox.appendChild(h('div', { class: 'pz-ciph-static',
+          text: '\u2591\u2591\u2591 \u2591\u2591\u2591\u2591\u2591 \u2591\u2591 \u2591\u2591\u2591\u2591\u2591\u2591 \u2591\u2591\u2591\u2591' }));
+        return;
+      }
       if (puzzle.mode === 'morse') {
         interceptBox.appendChild(h('span', { text: C.channel }));
         return;
@@ -395,6 +528,37 @@
         var ch = puzzle.cipher.charAt(i);
         interceptBox.appendChild(ch === ' ' ? h('span', { text: '\u2003' }) : h('b', { text: ch }));
       }
+    }
+
+    /** Both errands gate their own half of the desk, and neither is optional. */
+    function syncGates() {
+      PS.ui.clear(toolBox);
+      if (!gotKey()) {
+        toolBox.appendChild(h('div', { class: 'pz-ciph-locked' }, [
+          'Nothing here to read it with. ', h('b', { text: C.keyName }),
+          ' is somewhere else in this room, and without it the ',
+          puzzle.mode === 'caesar' ? 'ring' : (puzzle.mode === 'keyword' ? 'pad' : 'chart'),
+          ' is just a shape.'
+        ]));
+      } else {
+        toolBox.appendChild(tool);
+      }
+      if (!gotSignal()) {
+        toolBox.appendChild(h('div', { class: 'pz-ciph-locked' }, [
+          'And nothing is coming in. ', h('b', { text: C.srcName }), ' first.'
+        ]));
+      }
+      confirmBtn.disabled = finished || puzzle.solved || !gotSignal() || !gotKey();
+      paintIntercept();
+      paintOut();
+      paintHud();
+    }
+
+    function paintHud() {
+      if (!arena) return;
+      if (hudSignal) hudSignal.set(haveSignal ? 'locked on' : 'nothing', haveSignal ? 'good' : 'warn');
+      if (hudKey) hudKey.set(haveKey ? 'in hand' : 'missing', haveKey ? 'good' : 'warn');
+      if (hudReads) hudReads.set(String(puzzle.attempts), puzzle.attempts ? 'bad' : null);
     }
 
     /* ------------------------------------------------------- CAESAR: dial */
@@ -619,15 +783,23 @@
 
     function confirmRead() {
       if (finished || puzzle.solved) return;
+      if (!gotSignal() || !gotKey()) {
+        api.toast('You are missing half of it. Go and get the rest.', 'bad', 2600);
+        return;
+      }
       if (!isRight(puzzle)) {
         puzzle.attempts++;
         api.tweak({ morale: -4, energy: -2 });
         api.toast('It comes out as noise. Try it again.', 'bad', 2200);
+        if (arena) arena.hit('#e2695f');
         paintOut();
+        paintHud();
         return;
       }
       puzzle.solved = true;
       api.flash();
+      confirmBtn.disabled = true;
+      if (setStation) setStation.solve();
       paintOut();
       renderBranch();
     }
@@ -718,43 +890,108 @@
       });
     }
 
+    /* ============================================================== WORLD == */
+    /* Two errands and a desk. */
+
+    function takeSignal() {
+      if (finished || haveSignal) return;
+      haveSignal = true;
+      api.toast(C.srcLine, 'good', 3400);
+      if (setStation) setStation.pulse();
+      syncGates();
+    }
+
+    function takeKey() {
+      if (finished || haveKey) return;
+      haveKey = true;
+      api.toast(C.keyLine, 'good', 3400);
+      if (setStation) setStation.pulse();
+      syncGates();
+    }
+
+    function buildWorld() {
+      var room = parseRoom();
+      var m = room.marks;
+
+      arena = PS.arena.create(el, {
+        map: { w: room.w, h: room.h, tiles: room.tiles },
+        spawn: m['0'] || { x: 1, y: 1 },
+        avatar: C.avatar || '\uD83E\uDDCD',
+        light: state.stats.light
+      });
+      if (!arena) return false;
+      teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
+
+      hudSignal = arena.chip('Signal', C.srcIcon);
+      hudKey = arena.chip('Key', C.keyIcon);
+      hudReads = arena.chip('Bad reads', '\u2716');
+
+      arena.prop({
+        x: m['1'].x, y: m['1'].y, icon: C.srcIcon, label: C.srcName, hint: C.srcHint,
+        emits: 1.1, tint: '#6fb3e0', onActivate: takeSignal
+      });
+      arena.prop({
+        x: m['2'].x, y: m['2'].y, icon: C.keyIcon, label: C.keyName, hint: C.keyHint,
+        emits: 1.1, tint: '#e2a84e', onActivate: takeKey
+      });
+
+      setStation = arena.station({
+        x: m['3'].x, y: m['3'].y, icon: C.setIcon, label: C.setName,
+        hint: 'work it here', radius: 1.45, emits: 2.2,
+        onEnter: function (panelEl) { PS.ui.append(panelEl, panelStack); },
+        onOpen: function () { syncGates(); }
+      });
+
+      arena.note(C.roomNote);
+      arena.button('\u21A9 Give up on it', walkAway, 'pz-btn--danger');
+      arena.focus();
+      return true;
+    }
+
     /* ------------------------------------------------------------- layout */
 
-    PS.ui.append(actions, [
-      h('button', { class: 'pz-btn pz-btn--primary', type: 'button', onclick: confirmRead },
-        ['\u2713 That is what it says']),
-      h('button', { class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button', onclick: walkAway },
-        ['\u21A9 Give up on it'])
-    ]);
+    confirmBtn.addEventListener('click', confirmRead);
+    giveUpBtn.addEventListener('click', walkAway);
+    PS.ui.append(actions, [confirmBtn]);
 
     var tool = puzzle.mode === 'caesar' ? buildDial()
              : puzzle.mode === 'keyword' ? buildPad()
              : buildMorse();
 
-    PS.ui.append(toolBox, tool);
+    var interceptCard = h('div', { class: 'pz-card' }, [
+      h('div', { class: 'pz-card__head', text: 'Intercept \u00B7 ' +
+        (puzzle.mode === 'caesar' ? 'shifted alphabet'
+         : puzzle.mode === 'keyword' ? 'keyword alphabet' : 'morse') }),
+      interceptBox,
+      h('div', { class: 'pz-note', text: C.channel })
+    ]);
+    var readsCard = h('div', { class: 'pz-card' }, [
+      h('div', { class: 'pz-card__head', text: 'Reads as' }), outBox, noteBox
+    ]);
+    var decodeCard = h('div', { class: 'pz-card' }, [
+      h('div', { class: 'pz-card__head', text: 'Decode' }), toolBox
+    ]);
 
-    PS.ui.append(el, h('div', { class: 'pz-ciph' }, [
-      h('div', { class: 'pz-card' }, [
-        h('div', { class: 'pz-card__head', text: 'Intercept \u00B7 ' +
-          (puzzle.mode === 'caesar' ? 'shifted alphabet'
-           : puzzle.mode === 'keyword' ? 'keyword alphabet' : 'morse') }),
-        interceptBox,
-        h('div', { class: 'pz-note', text: C.channel })
-      ]),
-      h('div', { class: 'pz-card' }, [
-        h('div', { class: 'pz-card__head', text: 'Reads as' }),
-        outBox,
-        noteBox
-      ]),
-      h('div', { class: 'pz-card' }, [
-        h('div', { class: 'pz-card__head', text: 'Decode' }),
-        toolBox
-      ]),
-      actions
-    ]));
+    /* Built once. Walking away hides it; walking back hands these exact nodes
+       straight back, so a part-turned ring or a half-filled pad survives. */
+    var panelStack = h('div', { class: 'pz-ciph' }, [
+      interceptCard, readsCard, decodeCard, actions
+    ]);
 
-    paintIntercept();
-    paintOut();
+    var arenaOk = false;
+    if (PS.arena && typeof PS.arena.create === 'function') {
+      try { arenaOk = buildWorld(); }
+      catch (e) { arenaOk = false; if (root.console) console.warn('[e06] arena failed, falling back', e); }
+    }
+
+    if (!arenaOk) {
+      /* Degraded mode: the whole desk in front of you, nothing to walk to. */
+      arena = null;
+      actions.appendChild(giveUpBtn);
+      PS.ui.append(el, panelStack);
+    }
+
+    syncGates();
   }
 
   function unmount() {

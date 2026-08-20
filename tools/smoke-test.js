@@ -471,9 +471,91 @@ head('5. Blackout recovery (failure never ends the run)');
   }
 }
 
+/* -------------------------------------------------- Director hard overrides */
+
+// The override paths are the game's signature transitions, but in a random run
+// they fire only a handful of times each (forced-door 5, picked-lock 3 per
+// 1000 in a recent run) and NOTHING asserted on them — the reason counts were
+// printed and never checked. Coverage that depends on random incidence can
+// evaporate from an unrelated change without a single test going red, which is
+// exactly how the blackout path silently lost coverage when the crossroad
+// player model was fixed. So each override is now driven deliberately.
+head('6. Director hard overrides');
+
+{
+  function stateWithLast(seedLabel, scene, result, tweak) {
+    const st = PS.state.create({ runSeed: PS.rng.hash(seedLabel), seedLabel: seedLabel });
+    st.applyResult(result, scene);
+    if (tweak) tweak(st);
+    return st;
+  }
+
+  const baseResult = (over) => Object.assign({
+    outcome: 'success', stats: {}, gain: [], lose: [], tags: [],
+    signals: { logic: 1, brute: 0, caution: 1, speed: 0, scavenge: 0 },
+    choice: null, summary: 'Set up for an override test.'
+  }, over || {});
+
+  const scene = (engineId, biome) => ({
+    engineId: engineId, engineName: engineId, skinId: 'x',
+    title: 'x', icon: '?', biome: biome
+  });
+
+  function overrideReason(st) {
+    const p = PS.director.next(st, PS.profile.create(), PS.rng.create(PS.rng.hash('ovr')));
+    return p ? { reason: p.reason, id: p.engine.id } : null;
+  }
+
+  // light < 15 -> something that actually makes light
+  {
+    const st = stateWithLast('ovr-light', scene('balance_scales', 'wilderness'), baseResult(),
+      (s) => { s.stats.light = 4; });
+    const got = overrideReason(st);
+    ok(got && got.reason === 'override:light-critical',
+      'light below 15 forces a light-provider',
+      got ? `got ${got.reason} -> ${got.id}` : 'no pick');
+    if (got) {
+      const e = PS.registry.get(got.id);
+      ok(!!e && (e.provides.indexOf('light_source') >= 0 || e.provides.indexOf('fire') >= 0),
+        'the light override lands on an engine that provides light',
+        `${got.id} provides: ${e ? e.provides.join(', ') : '?'}`);
+    }
+  }
+
+  // failing in water -> the crossing you should have solved first
+  {
+    const st = stateWithLast('ovr-water', scene('measuring', 'water'),
+      baseResult({ outcome: 'fail' }), (s) => { s.stats.light = 90; });
+    const got = overrideReason(st);
+    ok(got && got.reason === 'override:water-fail',
+      'failing in a water biome forces the crossing',
+      got ? `got ${got.reason} -> ${got.id}` : 'no pick');
+  }
+
+  // escape_code + force_door -> knapsack
+  {
+    const st = stateWithLast('ovr-force', scene('escape_code', 'indoor'),
+      baseResult({ choice: 'force_door' }), (s) => { s.stats.light = 90; });
+    const got = overrideReason(st);
+    ok(got && got.reason === 'override:forced-door',
+      'forcing the door routes to the salvage you now need',
+      got ? `got ${got.reason} -> ${got.id}` : 'no pick');
+  }
+
+  // escape_code + pick_lock -> grid_crawl
+  {
+    const st = stateWithLast('ovr-pick', scene('escape_code', 'indoor'),
+      baseResult({ choice: 'pick_lock' }), (s) => { s.stats.light = 90; });
+    const got = overrideReason(st);
+    ok(got && got.reason === 'override:picked-lock',
+      'picking the lock routes to the quiet way out',
+      got ? `got ${got.reason} -> ${got.id}` : 'no pick');
+  }
+}
+
 /* ------------------------------------------------ save / restore round trip */
 
-head('6. Save round-trip');
+head('7. Save round-trip');
 let restored = null;
 try {
   PS.save.save(state, profile);
@@ -490,7 +572,7 @@ if (restored) {
 
 /* ------------------------------------------------------ file:// guardrails */
 
-head('7. file:// guardrails');
+head('8. file:// guardrails');
 
 function walk(dir, out = []) {
   for (const f of fs.readdirSync(dir, { withFileTypes: true })) {

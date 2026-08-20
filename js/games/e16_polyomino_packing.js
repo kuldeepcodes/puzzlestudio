@@ -4,9 +4,10 @@
    Self-contained: logic + 3 skins + its own CSS. No DOM access until mount().
 
    THE PUZZLE
-     A fixed bay and a pile of awkward shapes. Select a piece, turn it until
-     it looks right, and drop it in. Nothing may overlap and nothing may hang
-     over the edge.
+     A fixed bay and a pile of awkward shapes lying around it on the dock. You
+     walk out to a piece, pick it up, turn it in your hands until it looks
+     right, then carry it in and stand on the square its corner goes in.
+     Nothing may overlap and nothing may hang over the edge.
 
    WHY IT IS ALWAYS SOLVABLE
      The bay is generated BACKWARDS. It starts completely full, gets cut into
@@ -16,9 +17,10 @@
      is ever served, which also gives the hint something real to say.
 
    THE CHOICE THAT MATTERS
-     From tier 3 the tray holds one or two MORE pieces than the bay can take.
+     From tier 3 the dock holds one or two MORE pieces than the bay can take.
      Everything you get out is everything you packed, so the puzzle stops
-     being "can you fit it" and becomes "what are you willing to leave".
+     being "can you fit it" and becomes "what are you willing to leave" — and
+     now you have to physically walk past what you are leaving behind.
 
    THE BRANCH
      Loaded, you either move the load yourself or hand it over to be moved.
@@ -435,39 +437,77 @@
     return solvePack(puzzle.w, puzzle.h, puzzle.grid, loose, budget || 150000);
   }
 
+  /* ====================================================== ARENA GEOMETRY ==
+     The bay stops being a grid you click and becomes a floor you stand on.
+     One board cell is one tile, the loose pieces lie around it on the dock,
+     and the only way anything gets stowed is that you walk over, pick it up,
+     carry it in and stand on the square its corner goes in. */
+
+  var COLOURS = ['#b5763a', '#4f7f6a', '#5b7fa6', '#8a6aa8', '#a85f56', '#7f8a4f', '#4f8a8a', '#a08a4f'];
+  var DOCK_PAD = 4;
+  var AVATAR = '\uD83E\uDDCD';
+
+  function dockPlan(W, H) {
+    var w = W + DOCK_PAD * 2, hgt = H + DOCK_PAD * 2, tiles = [], x, y;
+    for (y = 0; y < hgt; y++) {
+      tiles.push([]);
+      for (x = 0; x < w; x++) {
+        tiles[y].push((x === 0 || y === 0 || x === w - 1 || y === hgt - 1) ? 1 : 0);
+      }
+    }
+    return { w: w, h: hgt, tiles: tiles };
+  }
+
+  /** Standing spots for the loose pieces: a ring two tiles off the bay. */
+  function dockSpots(W, H, want) {
+    var x0 = DOCK_PAD - 2, y0 = DOCK_PAD - 2;
+    var x1 = DOCK_PAD + W + 1, y1 = DOCK_PAD + H + 1;
+    var ring = [], x, y;
+    for (x = x0; x <= x1; x++) ring.push({ x: x, y: y0 });
+    for (y = y0 + 1; y <= y1; y++) ring.push({ x: x1, y: y });
+    for (x = x1 - 1; x >= x0; x--) ring.push({ x: x, y: y1 });
+    for (y = y1 - 1; y > y0; y--) ring.push({ x: x0, y: y });
+
+    var out = [], step;
+    for (step = 2; step >= 1; step--) {
+      out = [];
+      for (var i = 0; i < ring.length && out.length < want; i += step) out.push(ring[i]);
+      if (out.length >= want) break;
+    }
+    while (out.length < want) out.push(ring[out.length % ring.length]);
+    return out;
+  }
+
+  /** A loading dock has lights. What is hard here is the packing, not seeing. */
+  function arenaRadius(light) {
+    var l = light < 0 ? 0 : (light > 100 ? 100 : light);
+    return 5.2 + (l / 100) * 3.4;
+  }
+
   /* ================================================================ CSS == */
 
   var CSS = [
-    '.pz-pack{display:grid;grid-template-columns:minmax(0,1fr) minmax(236px,300px);gap:18px;align-items:start}',
-    '@media (max-width:900px){.pz-pack{grid-template-columns:1fr}}',
+    '.pz-pack{display:flex;flex-direction:column;gap:12px}',
 
-    '.pz-pack-baywrap{padding:14px;border-radius:12px;border:1px solid var(--line);',
-    '  background:repeating-linear-gradient(45deg,#0a0d13,#0a0d13 9px,#0c1017 9px,#0c1017 18px)}',
-    '.pz-pack-bay{display:grid;gap:3px;width:100%;max-width:470px;margin:0 auto}',
-    '.pz-pack-cell{position:relative;aspect-ratio:1/1;border-radius:5px;display:grid;place-items:center;',
-    '  font-size:clamp(11px,2.6vw,19px);line-height:1;cursor:pointer;',
-    '  background:#0e131b;border:1px solid #1e2531;color:transparent;',
-    '  transition:background .18s var(--ease),border-color .18s var(--ease),transform .12s var(--ease)}',
-    '.pz-pack-cell:hover{border-color:var(--acc)}',
-    '.pz-pack-cell.is-fill{color:rgba(0,0,0,.75);border-color:rgba(0,0,0,.4);',
-    '  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -2px 5px rgba(0,0,0,.35)}',
-    '.pz-pack-cell.is-ghost-ok{background:rgba(95,207,141,.34);border-color:var(--good)}',
-    '.pz-pack-cell.is-ghost-bad{background:rgba(226,105,95,.28);border-color:var(--bad)}',
-    '.pz-pack-cell.is-lift{outline:2px solid var(--acc);outline-offset:-2px}',
-    '.pz-pack-cell.is-locked{cursor:default}',
-    '.pz-pack-cell.is-locked:hover{border-color:#1e2531}',
+    '.pz-pack-tips{display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:12px;color:var(--dim);line-height:1.6}',
+    '.pz-pack-tips strong{color:var(--text-2);font-weight:600}',
+    '.pz-pack-cap{font-family:var(--font-mono);font-size:10.5px;padding:2px 7px;border-radius:5px;',
+    '  background:#0c1016;border:1px solid var(--line);border-bottom-width:2px;color:var(--text-2)}',
 
-    '.pz-pack-cell.is-c0{background:#b5763a}.pz-pack-cell.is-c1{background:#4f7f6a}',
-    '.pz-pack-cell.is-c2{background:#5b7fa6}.pz-pack-cell.is-c3{background:#8a6aa8}',
-    '.pz-pack-cell.is-c4{background:#a85f56}.pz-pack-cell.is-c5{background:#7f8a4f}',
-    '.pz-pack-cell.is-c6{background:#4f8a8a}.pz-pack-cell.is-c7{background:#a08a4f}',
+    '.pz-pack-hand{display:flex;align-items:center;gap:12px;min-height:62px;padding:10px 12px;border-radius:10px;',
+    '  background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line)}',
+    '.pz-pack-hand.is-holding{border-color:color-mix(in srgb,var(--acc) 62%,transparent);',
+    '  box-shadow:0 0 0 1px color-mix(in srgb,var(--acc) 18%,transparent)}',
+    '.pz-pack-hand__t{font-size:13px;font-weight:600;color:var(--text);line-height:1.3}',
+    '.pz-pack-hand__d{font-size:11.5px;color:var(--dim);line-height:1.45}',
+    '.pz-pack-hand__d b{color:var(--acc-2);font-weight:600}',
 
-    '.pz-pack-tray{display:flex;flex-direction:column;gap:7px;max-height:390px;overflow:auto;padding-right:2px}',
+    '.pz-pack-tray{display:flex;flex-wrap:wrap;gap:7px}',
     '.pz-pack-item{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;text-align:left;',
-    '  padding:7px 9px;border-radius:9px;cursor:pointer;color:var(--text-2);font-family:var(--font-ui);',
+    '  padding:7px 9px;border-radius:9px;cursor:pointer;color:var(--text-2);font-family:var(--font-ui);min-width:158px;',
     '  background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);',
     '  transition:border-color .18s var(--ease),transform .12s var(--ease),opacity .18s var(--ease)}',
-    '.pz-pack-item:hover{border-color:var(--acc);transform:translateX(2px)}',
+    '.pz-pack-item:hover{border-color:var(--acc);transform:translateY(-2px)}',
     '.pz-pack-item.is-sel{border-color:var(--acc);background:var(--acc-wash);color:var(--text)}',
     '.pz-pack-item.is-stowed{opacity:.5}',
     '.pz-pack-item.is-stowed .pz-pack-mini i{opacity:.55}',
@@ -479,20 +519,12 @@
     '.pz-pack-mini i.on.is-c2{background:#5b7fa6}.pz-pack-mini i.on.is-c3{background:#8a6aa8}',
     '.pz-pack-mini i.on.is-c4{background:#a85f56}.pz-pack-mini i.on.is-c5{background:#7f8a4f}',
     '.pz-pack-mini i.on.is-c6{background:#4f8a8a}.pz-pack-mini i.on.is-c7{background:#a08a4f}',
+    '.pz-pack-mini.is-big i{width:13px;height:13px;border-radius:3px}',
 
     '.pz-pack-name{font-size:12px;line-height:1.35;min-width:0}',
     '.pz-pack-name b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
     '.pz-pack-name span{font-family:var(--font-mono);font-size:10px;color:var(--dimmer)}',
     '.pz-pack-badge{font-size:15px}',
-
-    '.pz-pack-rows{display:flex;flex-direction:column;gap:6px}',
-    '.pz-pack-row{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:11px;color:var(--dim)}',
-    '.pz-pack-row b{color:var(--acc-2)}',
-    '.pz-pack-row.is-good b{color:var(--good)}',
-
-    '.pz-pack-meterbar{height:7px;border-radius:99px;background:#12171f;overflow:hidden;border:1px solid var(--line-soft)}',
-    '.pz-pack-meterbar div{height:100%;width:0;border-radius:99px;transition:width .35s var(--ease);',
-    '  background:linear-gradient(90deg,var(--acc),var(--acc-2))}',
 
     '.pz-pack-note{font-size:12px;line-height:1.5;color:var(--warn);padding:9px 11px;border-radius:7px;',
     '  background:rgba(230,180,85,.08);border:1px solid rgba(230,180,85,.26)}',
@@ -508,109 +540,283 @@
     var C = puzzle.content;
     var W = puzzle.w, H = puzzle.h;
     var finished = false;
-    var sel = null;                 // selected piece id
-    var ghost = [];                 // cell indexes currently previewed
+    var arena = null;
 
-    var cellEls = [];
-    var bay = h('div', { class: 'pz-pack-bay', style: { gridTemplateColumns: 'repeat(' + W + ', 1fr)' } });
-    var tray = h('div', { class: 'pz-pack-tray' });
-    var rows = h('div', { class: 'pz-pack-rows' });
-    var barFill = h('div', {});
+    var carried = null;              // the piece in your hands, by id
+    var bayProps = [];               // one per bay square
+    var propOf = {};                 // piece id -> its prop out on the dock
+    var spots = {};                  // piece id -> its spot on the dock
+    var ghost = { at: -1, rot: -1, cells: null, ok: false };
+
+    var stage = h('div', {});
+    var handBox = h('div', { class: 'pz-pack-hand' });
     var noteBox = h('div', {});
-    var controls = h('div', { class: 'pz-col' });
+    var tray = h('div', { class: 'pz-pack-tray' });
+    var endBox = h('div', { class: 'pz-col' });
 
-    /* ---------------------------------------------------------------- bay -- */
+    PS.ui.append(el, h('div', { class: 'pz-pack' }, [
+      h('div', { class: 'pz-intro', text: C.goal }),
+      stage,
+      h('div', { class: 'pz-pack-tips' }, [
+        h('span', {}, [
+          h('b', { class: 'pz-pack-cap', text: 'W A S D' }), ' / ',
+          h('b', { class: 'pz-pack-cap', text: '\u2190\u2191\u2193\u2192' }), ' walk \u00B7 ',
+          h('b', { class: 'pz-pack-cap', text: 'E' }), ' picks up and puts down \u00B7 ',
+          h('b', { class: 'pz-pack-cap', text: 'R' }), ' or the ', h('strong', { text: 'wheel' }), ' turns what you are carrying'
+        ])
+      ]),
+      handBox, noteBox, tray, endBox
+    ]));
 
-    for (var k = 0; k < W * H; k++) {
-      (function (idx) {
-        var r = (idx / W) | 0, c = idx % W;
-        var cell = h('div', { class: 'pz-pack-cell', 'data-act': 'cell:' + r + ',' + c });
-        cell.addEventListener('click', function () { tapCell(r, c); });
-        cell.addEventListener('mouseover', function () { preview(r, c); });
-        cell.addEventListener('mouseout', function () { clearGhost(); });
-        cellEls.push(cell);
-        bay.appendChild(cell);
-      })(k);
+    /* ------------------------------------------------------- degraded mode -- */
+    if (!PS.arena || typeof PS.arena.create !== 'function') {
+      PS.ui.append(endBox, [
+        h('div', { class: 'pz-intro', text: C.partial }),
+        h('div', { class: 'pz-choices' }, [choiceBtn(C.haul, 'force_door'), choiceBtn(C.hand, 'trade')])
+      ]);
+      return;
     }
 
-    function selected() { return sel === null ? null : pieceById(puzzle, sel); }
+    /* -------------------------------------------------------------- arena -- */
+
+    arena = PS.arena.create(stage, {
+      map: dockPlan(W, H),
+      spawn: { x: 1, y: 1 },
+      avatar: AVATAR,
+      light: state.stats.light,
+      lightCurve: arenaRadius,
+      darkness: 0.78,
+      memory: 0.5,
+      onTick: trackGhost
+    });
+    if (!arena) return;
+    teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
+
+    arena.revealAll();
+
+    /* --------------------------------------------------------------- HUD --- */
+
+    var mFill = arena.meter('Packed', '\uD83D\uDCE6');
+    var cHand = arena.chip('In hand', '\uD83E\uDD32');
+    var cLoose = arena.chip('Still ' + C.loose, '\uD83D\uDCCD');
+    var cActs = arena.chip('Handling', '\uD83D\uDD04');
+
+    arena.note('Walk to a ' + C.unitName + ' and press E to pick it up. Then stand on the square in the ' +
+      C.bay + ' where its top-left corner goes and press E again.');
+    arena.button('\u21BB Turn it (R)', rotate);
+    arena.button('\u2715 Empty the ' + C.bay, clearBay);
+    arena.button(C.commit, commitPartial, 'pz-btn--primary');
+    arena.button('\u21A9 Leave the lot', abandon, 'pz-btn--danger');
+
+    /* ---------------------------------------------------------- the floor -- */
+
+    for (var k = 0; k < W * H; k++) addBaySquare(k);
+
+    var ring = dockSpots(W, H, puzzle.order.length);
+    for (var o = 0; o < puzzle.order.length; o++) {
+      var pc = pieceById(puzzle, puzzle.order[o]);
+      spots[pc.id] = ring[o];
+      addLoose(pc);
+    }
+
+    function addBaySquare(idx) {
+      var r = (idx / W) | 0, c = idx % W;
+      bayProps.push(arena.prop({
+        x: DOCK_PAD + c, y: DOCK_PAD + r,
+        icon: '\u00B7', label: PS.state.prettify(C.bay),
+        hint: 'E \u00B7 put it down here',
+        trigger: 'press', once: false, radius: 0.55,
+        glow: false, emits: 0, tint: '#2f3846',
+        onActivate: function () { tapCell(r, c); }
+      }));
+    }
+
+    function addLoose(piece) {
+      propOf[piece.id] = arena.prop({
+        x: spots[piece.id].x, y: spots[piece.id].y,
+        icon: piece.icon, label: piece.label,
+        hint: 'E \u00B7 pick it up \u00B7 ' + piece.size + ' squares',
+        trigger: 'press', once: false, radius: 0.85,
+        glow: true, emits: 0.75, tint: COLOURS[piece.colour % 8],
+        onActivate: function () { pickUp(piece.id); }
+      });
+    }
+
+    function locked() { return finished || puzzle.committed; }
+
+    /* ------------------------------------------------------------ handling */
+
+    function held() { return carried === null ? null : pieceById(puzzle, carried); }
+
+    function stow(piece) {                       // back onto the dock it goes
+      if (!piece || !propOf[piece.id]) return;
+      propOf[piece.id].raw.gone = false;
+      propOf[piece.id].move(spots[piece.id].x, spots[piece.id].y);
+    }
+
+    function intoHands(piece) {
+      var was = held();
+      if (was && was !== piece) stow(was);
+      carried = piece.id;
+      propOf[piece.id].raw.gone = true;          // it is in your arms now
+      arena.setAvatar(piece.icon);
+      ghost.at = -1;
+    }
+
+    function emptyHands() {
+      var was = held();
+      carried = null;
+      if (was) stow(was);
+      arena.setAvatar(AVATAR);
+      ghost.at = -1;
+    }
+
+    function pickUp(id) {
+      if (locked()) return;
+      var p = pieceById(puzzle, id);
+      if (!p) return;
+      if (p.placed) { lift(puzzle, p); puzzle.actions++; }
+      intoHands(p);
+      paint();
+    }
 
     function tapCell(r, c) {
-      if (finished || puzzle.committed) return;
+      if (locked()) return;
       var idx = r * W + c;
       var occupant = puzzle.grid[idx];
 
       if (occupant >= 0) {                       // pull that one back out
         var p = pieceById(puzzle, occupant);
         lift(puzzle, p);
-        sel = p.id;
         puzzle.actions++;
-        clearGhost();
+        intoHands(p);
+        arena.dust(DOCK_PAD + c, DOCK_PAD + r, 5, COLOURS[p.colour % 8]);
         paint();
         return;
       }
 
-      var cur = selected();
-      if (!cur) { api.toast('Pick something out of the tray first.', 'bad'); return; }
+      var cur = held();
+      if (!cur) {
+        api.toast('Nothing in your hands. Walk to a ' + C.unitName + ' on the dock and press E.', 'bad');
+        return;
+      }
       if (cur.placed) lift(puzzle, cur);
 
       if (!place(puzzle, cur, r, c)) {
         api.toast('It will not go in there \u2014 turn it, or try another corner.', 'bad');
+        if (arena) arena.shake(2, 0.2);
         return;
       }
       puzzle.actions++;
-      sel = nextLoose(cur.id);
-      clearGhost();
+      emptyHands();
+      if (arena) {
+        arena.dust(DOCK_PAD + c, DOCK_PAD + r, 6, COLOURS[cur.colour % 8]);
+        arena.ping(DOCK_PAD + c, DOCK_PAD + r, COLOURS[cur.colour % 8]);
+      }
       paint();
       if (puzzle.filled === puzzle.cells) packedOut();
     }
 
-    function nextLoose(afterId) {
-      var ord = puzzle.order;
-      var start = ord.indexOf(afterId);
-      for (var i = 1; i <= ord.length; i++) {
-        var p = pieceById(puzzle, ord[(start + i) % ord.length]);
-        if (p && !p.placed) return p.id;
-      }
-      return null;
+    function rotate() {
+      if (locked()) return;
+      var cur = held();
+      if (!cur) { api.toast('Nothing in your hands to turn.', 'bad'); return; }
+      if (cur.placed) lift(puzzle, cur);
+      cur.rot = (cur.rot + 1) % cur.rots.length;
+      puzzle.actions++;
+      ghost.at = -1;
+      paint();
     }
 
-    function preview(r, c) {
-      if (finished || puzzle.committed) return;
-      clearGhost();
-      var idx = r * W + c;
-      if (puzzle.grid[idx] >= 0) {
-        var occ = pieceById(puzzle, puzzle.grid[idx]);
-        for (var i = 0; i < occ.placed.cells.length; i++) {
-          cellEls[occ.placed.cells[i]].classList.add('is-lift');
-          ghost.push(occ.placed.cells[i]);
+    function clearBay() {
+      if (locked()) return;
+      for (var i = 0; i < puzzle.pieces.length; i++) {
+        if (puzzle.pieces[i].placed) lift(puzzle, puzzle.pieces[i]);
+      }
+      puzzle.actions++;
+      ghost.at = -1;
+      paint();
+    }
+
+    /* ----------------------------------------------------------- the ghost */
+    /* What you are carrying, previewed on the floor you are standing on. */
+
+    function trackGhost(dt, a) {
+      if (locked() || !a) return;
+      var pl = a.player();
+      var r = pl.ty - DOCK_PAD, c = pl.tx - DOCK_PAD;
+      var cur = held();
+      var at = (cur && r >= 0 && c >= 0 && r < H && c < W) ? (r * W + c) : -1;
+      var rot = cur ? cur.rot : -1;
+      if (at === ghost.at && rot === ghost.rot) return;
+
+      ghost.at = at; ghost.rot = rot; ghost.cells = null; ghost.ok = false;
+      if (at >= 0) {
+        var fit = canPlace(puzzle, cur, r, c);
+        ghost.ok = !!fit;
+        ghost.cells = fit || [at];
+      }
+      paintBay();
+    }
+
+    /* -------------------------------------------------------------- paint -- */
+
+    function paintBay() {
+      var lit = {};
+      if (ghost.cells) for (var g = 0; g < ghost.cells.length; g++) lit[ghost.cells[g]] = 1;
+
+      for (var i = 0; i < bayProps.length; i++) {
+        var raw = bayProps[i].raw;
+        var owner = puzzle.grid[i];
+        if (owner >= 0) {
+          var p = pieceById(puzzle, owner);
+          raw.icon = (p.placed && p.placed.cells[0] === i) ? p.icon : '\u25A0';
+          raw.tint = COLOURS[p.colour % 8];
+          raw.hint = locked() ? '' : 'E \u00B7 lift it back out';
+        } else if (lit[i]) {
+          raw.icon = ghost.ok ? '\u25A1' : '\u2715';
+          raw.tint = ghost.ok ? '#5fcf8d' : '#e2695f';
+          raw.hint = ghost.ok ? 'E \u00B7 put it down here' : 'it will not go here';
+        } else {
+          raw.icon = '\u00B7';
+          raw.tint = '#2f3846';
+          raw.hint = locked() ? '' : 'E \u00B7 put it down here';
         }
-        return;
-      }
-      var cur = selected();
-      if (!cur || cur.placed) return;
-      var ok = canPlace(puzzle, cur, r, c);
-      if (ok) {
-        for (var j = 0; j < ok.length; j++) { cellEls[ok[j]].classList.add('is-ghost-ok'); ghost.push(ok[j]); }
-      } else {
-        cellEls[idx].classList.add('is-ghost-bad'); ghost.push(idx);
       }
     }
 
-    function clearGhost() {
-      for (var i = 0; i < ghost.length; i++) {
-        cellEls[ghost[i]].classList.remove('is-ghost-ok', 'is-ghost-bad', 'is-lift');
+    function paint() {
+      if (!arena) return;
+      paintBay();
+
+      for (var i = 0; i < puzzle.pieces.length; i++) {
+        var p = puzzle.pieces[i];
+        if (!propOf[p.id]) continue;
+        var loose = !p.placed && carried !== p.id;
+        propOf[p.id].raw.gone = !loose;
+        propOf[p.id].raw.hint = 'E \u00B7 pick it up \u00B7 ' + p.size + ' squares';
       }
-      ghost = [];
+
+      var looseCount = puzzle.pieces.filter(function (q) { return !q.placed; }).length;
+      var pct = Math.round((puzzle.filled / puzzle.cells) * 100);
+      var cur = held();
+
+      mFill.set(pct, puzzle.filled + ' / ' + puzzle.cells + ' sq',
+        puzzle.filled === puzzle.cells ? 'good' : null);
+      cHand.set(cur ? cur.label : 'empty', cur ? 'good' : null);
+      cLoose.set(String(looseCount));
+      cActs.set(String(puzzle.actions));
+
+      paintHand();
+      paintTray();
+      paintNote();
     }
 
-    /* -------------------------------------------------------------- tray -- */
-
-    function miniOf(piece) {
+    function miniOf(piece, big) {
       var sh = shapeOf(piece);
       var mini = h('div', {
-        class: 'pz-pack-mini',
-        style: { gridTemplateColumns: 'repeat(' + sh.w + ', 9px)' }
+        class: 'pz-pack-mini' + (big ? ' is-big' : ''),
+        style: { gridTemplateColumns: 'repeat(' + sh.w + ', ' + (big ? 13 : 9) + 'px)' }
       });
       var on = {};
       for (var i = 0; i < sh.cells.length; i++) on[sh.cells[i][0] + ',' + sh.cells[i][1]] = true;
@@ -622,118 +828,72 @@
       return mini;
     }
 
+    function paintHand() {
+      PS.ui.clear(handBox);
+      var cur = held();
+      if (!cur) {
+        handBox.className = 'pz-pack-hand';
+        PS.ui.append(handBox, h('div', { class: 'pz-pack-hand__d' }, [
+          'Empty handed. Walk to a ', h('b', { text: C.unitName }),
+          ' out on the dock and press E to lift it.'
+        ]));
+        return;
+      }
+      handBox.className = 'pz-pack-hand is-holding';
+      PS.ui.append(handBox, [
+        miniOf(cur, true),
+        h('div', {}, [
+          h('div', { class: 'pz-pack-hand__t', text: cur.label + ' \u00B7 ' + cur.size + ' squares' }),
+          h('div', { class: 'pz-pack-hand__d' }, [
+            'Turn ', h('b', { text: (cur.rot % cur.rots.length) + 1 + ' of ' + cur.rots.length }),
+            ' \u00B7 stand on the square its ', h('b', { text: 'top-left corner' }), ' goes in and press E.'
+          ])
+        ])
+      ]);
+    }
+
     function paintTray() {
       PS.ui.clear(tray);
       for (var i = 0; i < puzzle.order.length; i++) {
         (function (piece) {
           var cls = 'pz-pack-item';
-          if (piece.id === sel) cls += ' is-sel';
+          if (piece.id === carried) cls += ' is-sel';
           if (piece.placed) cls += ' is-stowed';
-          var btn = h('button', {
+          tray.appendChild(h('button', {
             class: cls, type: 'button', 'data-act': 'piece:' + piece.id,
-            title: piece.label + ' \u2014 ' + piece.size + ' squares',
-            onclick: function () { tapPiece(piece.id); }
+            title: piece.label + ' \u2014 ' + piece.size + ' squares. Click to walk over to it.',
+            onclick: function () { walkTo(piece.id); }
           }, [
             miniOf(piece),
             h('div', { class: 'pz-pack-name' }, [
               h('b', { text: piece.label }),
-              h('span', { text: piece.size + ' sq' + (piece.placed ? ' \u00B7 stowed' : '') })
+              h('span', { text: piece.size + ' sq' + (piece.placed ? ' \u00B7 stowed' : (piece.id === carried ? ' \u00B7 in hand' : '')) })
             ]),
             h('div', { class: 'pz-pack-badge', text: piece.placed ? '\u2713' : piece.icon })
-          ]);
-          tray.appendChild(btn);
+          ]));
         })(pieceById(puzzle, puzzle.order[i]));
       }
     }
 
-    function tapPiece(id) {
-      if (finished || puzzle.committed) return;
+    /** The list is a map, not a substitute for walking: it sends you there. */
+    function walkTo(id) {
+      if (locked() || !arena) return;
       var p = pieceById(puzzle, id);
-      // Always select. A toggle here reads as "nothing happened" the moment
-      // the tray auto-advances onto the piece you were about to click.
-      if (p.placed) { lift(puzzle, p); puzzle.actions++; }
-      sel = id;
-      clearGhost();
-      paint();
-    }
-
-    function rotate() {
-      if (finished || puzzle.committed) return;
-      var cur = selected();
-      if (!cur) { api.toast('Nothing in your hands to turn.', 'bad'); return; }
-      if (cur.placed) lift(puzzle, cur);
-      cur.rot = (cur.rot + 1) % cur.rots.length;
-      puzzle.actions++;
-      clearGhost();
-      paint();
-    }
-
-    function clearBay() {
-      if (finished || puzzle.committed) return;
-      for (var i = 0; i < puzzle.pieces.length; i++) lift(puzzle, puzzle.pieces[i]);
-      puzzle.actions++;
-      clearGhost();
-      paint();
-    }
-
-    /* -------------------------------------------------------------- paint -- */
-
-    function paint() {
-      var lock = finished || puzzle.committed;
-      for (var i = 0; i < cellEls.length; i++) {
-        var owner = puzzle.grid[i];
-        var cls = 'pz-pack-cell';
-        if (lock) cls += ' is-locked';
-        if (owner >= 0) {
-          var p = pieceById(puzzle, owner);
-          cls += ' is-fill is-c' + p.colour;
-          cellEls[i].textContent = (p.placed && p.placed.cells[0] === i) ? p.icon : '';
-        } else {
-          cellEls[i].textContent = '';
-        }
-        cellEls[i].className = cls;
-      }
-      paintTray();
-      paintRows();
-      paintNote();
-    }
-
-    function row(k, v, good) {
-      return h('div', { class: 'pz-pack-row' + (good ? ' is-good' : '') }, [
-        h('span', { text: k }), h('b', { text: v })
-      ]);
-    }
-
-    function paintRows() {
-      PS.ui.clear(rows);
-      var loose = puzzle.pieces.filter(function (p) { return !p.placed; }).length;
-      var pct = Math.round((puzzle.filled / puzzle.cells) * 100);
-      PS.ui.append(rows, [
-        row('Bay', W + ' \u00D7 ' + H + ' squares'),
-        row('Packed', puzzle.filled + ' / ' + puzzle.cells + ' (' + pct + '%)', puzzle.filled === puzzle.cells),
-        row('Stowed', String(puzzle.pieces.length - loose) + ' ' + C.unitPlural),
-        row('Still ' + C.loose, String(loose)),
-        row('Handling', String(puzzle.actions))
-      ]);
-      barFill.style.width = pct + '%';
+      if (!p) return;
+      if (p.placed) arena.goTo(DOCK_PAD + (p.placed.cells[0] % W), DOCK_PAD + ((p.placed.cells[0] / W) | 0));
+      else if (id !== carried) arena.goTo(spots[id].x, spots[id].y);
     }
 
     function paintNote() {
       PS.ui.clear(noteBox);
-      if (finished || puzzle.committed) return;
+      if (locked()) return;
       if (puzzle.filled === puzzle.cells) {
         noteBox.appendChild(h('div', { class: 'pz-pack-note is-good', text: C.full }));
         return;
       }
       if (puzzle.extras > 0 && puzzle.filled === 0) {
         noteBox.appendChild(h('div', { class: 'pz-pack-note', text:
-          'There are more ' + C.unitPlural + ' here than the ' + C.bay + ' will hold. Some of this is not coming.' }));
-        return;
-      }
-      var cur = selected();
-      if (cur) {
-        noteBox.appendChild(h('div', { class: 'pz-pack-note', text:
-          'Holding the ' + cur.label.toLowerCase() + '. The square you click is the square its top-left corner lands on.' }));
+          'There are more ' + C.unitPlural + ' out here than the ' + C.bay + ' will hold. Some of this is not coming.' }));
       }
     }
 
@@ -741,9 +901,10 @@
 
     function packedOut() {
       puzzle.committed = true;
+      emptyHands();
       paint();
-      PS.ui.clear(controls);
-      PS.ui.append(controls, [
+      PS.ui.clear(endBox);
+      PS.ui.append(endBox, [
         h('div', { class: 'pz-intro', text: C.full + ' ' + placedPieces(puzzle).length + ' ' + C.unitPlural + ' aboard.' }),
         h('div', { class: 'pz-choices' }, [choiceBtn(C.haul, 'force_door'), choiceBtn(C.hand, 'trade')])
       ]);
@@ -798,13 +959,14 @@
     }
 
     function commitPartial() {
-      if (finished || puzzle.committed) return;
+      if (locked()) return;
       if (puzzle.filled === puzzle.cells) { packedOut(); return; }
       if (puzzle.filled === 0) { api.toast('You cannot leave with nothing. Put something in.', 'bad'); return; }
       puzzle.committed = true;
+      emptyHands();
       paint();
-      PS.ui.clear(controls);
-      PS.ui.append(controls, [
+      PS.ui.clear(endBox);
+      PS.ui.append(endBox, [
         h('div', { class: 'pz-intro', text: C.partial }),
         h('div', { class: 'pz-choices' }, [choiceBtn(C.haul, 'force_door'), choiceBtn(C.hand, 'trade')])
       ]);
@@ -826,55 +988,27 @@
       });
     }
 
-    /* ------------------------------------------------------------ keyboard */
+    /* --------------------------------------------------------- turning it - */
 
     function onKey(ev) {
-      if (finished || puzzle.committed) return;
-      if (ev.key === 'r' || ev.key === 'R') { ev.preventDefault(); rotate(); return; }
-      if (ev.key === 'Escape') { sel = null; clearGhost(); paint(); }
+      if (locked() || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      if (ev.key === 'r' || ev.key === 'R') { ev.preventDefault(); rotate(); }
     }
     document.addEventListener('keydown', onKey);
     teardownFns.push(function () { document.removeEventListener('keydown', onKey); });
 
-    /* ------------------------------------------------------------- layout -- */
+    function onWheel(ev) {
+      if (locked() || carried === null) return;
+      ev.preventDefault();
+      rotate();
+    }
+    arena.canvas.addEventListener('wheel', onWheel, { passive: false });
+    teardownFns.push(function () {
+      if (arena) arena.canvas.removeEventListener('wheel', onWheel);
+    });
 
-    PS.ui.append(controls, [
-      h('div', { class: 'pz-row' }, [
-        h('button', { class: 'pz-btn pz-btn--sm', type: 'button', 'data-act': 'rotate', onclick: rotate },
-          ['\u21BB Turn it (R)']),
-        h('button', { class: 'pz-btn pz-btn--sm', type: 'button', 'data-act': 'clear', onclick: clearBay },
-          ['\u2715 Empty the ' + C.bay])
-      ]),
-      h('button', { class: 'pz-btn pz-btn--primary', type: 'button', 'data-act': 'commit', onclick: commitPartial },
-        [C.commit]),
-      h('button', { class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button', 'data-act': 'giveup', onclick: abandon },
-        ['\u21A9 Leave the lot'])
-    ]);
-
-    PS.ui.append(el, h('div', { class: 'pz-pack' }, [
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-intro', text: C.goal }),
-        h('div', { class: 'pz-pack-baywrap' }, [bay]),
-        h('div', { class: 'pz-note' }, [
-          'Pick a ', h('strong', { text: C.unitName }), ', turn it with ',
-          h('strong', { text: 'R' }), ', then click the square where its top-left corner should sit. ',
-          'Click anything already stowed to pull it back out.'
-        ])
-      ]),
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: PS.state.prettify(C.bay) }),
-          rows,
-          h('div', { class: 'pz-pack-meterbar' }, [barFill])
-        ]),
-        noteBox,
-        h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'To go' }), tray]),
-        h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'Handling' }), controls])
-      ])
-    ]));
-
-    sel = puzzle.order.length ? puzzle.order[0] : null;
     paint();
+    arena.focus();
   }
 
   function unmount() {

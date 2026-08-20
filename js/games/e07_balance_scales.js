@@ -15,6 +15,14 @@
 
      You may name your suspect at any moment. Being wrong hurts, twice.
 
+   HOW YOU TOUCH IT
+     The batch is on the floor and the balance is a place. Nothing goes on a
+     pan until you have walked over to the rack it sits in and picked it up,
+     so what you are carrying is a physical fact and the weighing you can
+     actually set up is limited by the legwork you have done. The beam, the
+     log and the accusation all live at the balance, because that part is
+     arithmetic and arithmetic is done standing still.
+
    THE BRANCH
      Finding the bad one is not the end. You are standing over a batch you now
      trust, and what you do with it is what the Director reads next.
@@ -35,6 +43,8 @@
       lineBlind: 'Nobody knows which way it went wrong. It could be swollen or it could be half empty.',
       rig: 'field balance',
       rigLine: 'A stick, a length of cord and two mess tins. It is not a laboratory, but it does not lie.',
+      avatar: '\uD83E\uDDD7', rigIcon: '\u2696\uFE0F', rackIcon: '\uD83E\uDDFA', rackName: 'cache',
+      roomNote: 'The cache is spread across the moss. Walk to a bundle to pick it up \u2014 nothing goes on the beam until it is in your hands.',
       good: 'water',
       goodGain: ['water', 'water'],
       caughtIt: 'You set it aside in the moss, cap down, and do not think about it again.',
@@ -49,6 +59,8 @@
       lineBlind: 'The forger is good. It could be over or under and nobody will tell you which.',
       rig: 'jeweller\u2019s balance',
       rigLine: 'Brass arms, agate bearing, still true after everything. The one honest thing on this street.',
+      avatar: '\uD83E\uDDCD', rigIcon: '\u2696\uFE0F', rackIcon: '\uD83D\uDC5C', rackName: 'purse',
+      roomNote: 'The handful is scattered across the counters. Go and collect a purse before you can put anything on the brass.',
       good: 'fare',
       goodGain: ['coin', 'coin'],
       caughtIt: 'You bite it, and the bite tells you the same thing the balance did.',
@@ -63,6 +75,8 @@
       lineBlind: 'Overcharged or empty, the gauge on all of them reads the same lie.',
       rig: 'load beam',
       rigLine: 'A calibration beam bolted to the rack wall, meant for exactly this and used for it maybe twice a year.',
+      avatar: '\uD83E\uDDCD', rigIcon: '\u2696\uFE0F', rackIcon: '\uD83D\uDDC4\uFE0F', rackName: 'rack',
+      roomNote: 'The bottles are still in their racks. Walk one down and carry it over \u2014 the beam only weighs what you bring it.',
       good: 'air',
       goodGain: ['canister', 'mask'],
       caughtIt: 'You chalk a cross on the collar and roll it away from the others.',
@@ -172,6 +186,60 @@
     return w;
   }
 
+  /* ============================================================== FLOOR == */
+  /* The batch is not a list, it is a room. Items sit in racks on a lattice
+     wide enough to walk between, the balance stands against the near wall,
+     and nothing reaches a pan without a trip. Everything here is derived
+     from puzzle.n, so it is deterministic and needs no rng of its own. */
+
+  /** Items per rack: never more than a dozen trips, never a rack of one at T1. */
+  function rackSize(n) { return n <= 12 ? 1 : Math.ceil(n / 10); }
+
+  function floorPlan(puzzle) {
+    var n = puzzle.n;
+    var per = rackSize(n);
+    var racks = [], i;
+    for (i = 0; i < n; i += per) {
+      racks.push({ items: [], x: 0, y: 0 });
+      for (var k = i; k < Math.min(n, i + per); k++) racks[racks.length - 1].items.push(k);
+    }
+
+    var cols = Math.min(5, Math.max(2, Math.ceil(Math.sqrt(racks.length))));
+    var rows = Math.ceil(racks.length / cols);
+
+    var x0 = 5, y0 = 2;
+    var W = x0 + cols * 2 + 1;
+    var H = Math.max(9, y0 + rows * 2 + 2);
+
+    var tiles = [], x, y, row;
+    for (y = 0; y < H; y++) {
+      row = [];
+      for (x = 0; x < W; x++) row.push(x === 0 || y === 0 || x === W - 1 || y === H - 1 ? 1 : 0);
+      tiles.push(row);
+    }
+
+    for (i = 0; i < racks.length; i++) {
+      racks[i].x = x0 + (i % cols) * 2;
+      racks[i].y = y0 + Math.floor(i / cols) * 2;
+    }
+
+    // Pillars in the gaps between racks. Single tiles two apart in an open
+    // room, so the floor stays one connected piece by construction.
+    for (var ri = 0; ri + 1 < rows; ri++) {
+      for (var ci = 0; ci + 1 < cols; ci++) {
+        if ((ri + ci) % 2) continue;
+        var px = x0 + ci * 2 + 1, py = y0 + ri * 2 + 1;
+        if (px > 0 && py > 0 && px < W - 1 && py < H - 1) tiles[py][px] = 1;
+      }
+    }
+
+    return {
+      tiles: tiles, w: W, h: H, racks: racks,
+      spawn: { x: 2, y: H - 2 },
+      rig: { x: 2, y: Math.max(1, Math.floor(H / 2)) }
+    };
+  }
+
   /* ================================================================ CSS == */
 
   var CSS = [
@@ -236,7 +304,13 @@
     '  background:rgba(226,105,95,.08);border:1px solid rgba(226,105,95,.28)}',
 
     '.pz-scale-tip{animation:pzScaleTip .55s var(--ease)}',
-    '@keyframes pzScaleTip{0%{filter:brightness(1)}35%{filter:brightness(1.5)}100%{filter:brightness(1)}}'
+    '@keyframes pzScaleTip{0%{filter:brightness(1)}35%{filter:brightness(1.5)}100%{filter:brightness(1)}}',
+
+    '.pz-scale-rigcol{display:flex;flex-direction:column;gap:12px}',
+    '.pz-scale-floor{display:flex;flex-wrap:wrap;gap:5px;padding:10px;border-radius:11px;',
+    '  background:#070a0f;border:1px dashed var(--line-soft);min-height:44px}',
+    '.pz-scale-chip.is-away{opacity:.34;cursor:default;border-style:dashed}',
+    '.pz-scale-chip.is-away:hover{transform:none;border-color:var(--line)}'
   ].join('\n');
 
   /* ================================================================ MOUNT = */
@@ -250,10 +324,28 @@
     var declaring = false;
     var named = null;              // index the player is pointing at, pre-commit
 
+    var arena = null;
+    var held = {};                 // item index -> actually in your hands
+    var rigStation = null;
+    var hudWeigh = null, hudHands = null, hudSuspect = null, hudCalls = null;
+
+    /** Without the arena there is no legwork, so everything is already to hand. */
+    function inHand(i) { return arena ? !!held[i] : true; }
+
+    function handCount() {
+      var n = 0;
+      for (var i = 0; i < puzzle.n; i++) if (inHand(i)) n++;
+      return n;
+    }
+
     var rig = h('div', { class: 'pz-scale-rig' });
     var panL = h('div', { class: 'pz-scale-pan pz-scale-pan--l' });
     var panR = h('div', { class: 'pz-scale-pan pz-scale-pan--r' });
     var tray = h('div', { class: 'pz-scale-tray' });
+    var floorBox = h('div', { class: 'pz-scale-floor' });
+    var floorCard = h('div', { class: 'pz-card' }, [
+      h('div', { class: 'pz-card__head', text: 'Still on the floor' }), floorBox
+    ]);
     var verdict = h('div', { class: 'pz-scale-verdict' });
     var logBox = h('div', { class: 'pz-scale-log' });
     var meter = h('div', { class: 'pz-scale-meter' });
@@ -279,6 +371,10 @@
     function cycle(i) {
       if (finished) return;
       if (declaring) { named = (named === i ? null : i); paint(); return; }
+      if (!inHand(i)) {
+        api.toast('That one is still out on the floor. Go and pick it up.', 'bad', 2600);
+        return;
+      }
       var w = where(i);
       drop(puzzle.left, i); drop(puzzle.right, i);
       if (w === 'tray') puzzle.left.push(i);
@@ -290,11 +386,16 @@
 
     function chip(i, cls) {
       var alive = suspects.indexOf(i) >= 0;
+      var away = !inHand(i);
       var c = 'pz-scale-chip' + (cls ? ' ' + cls : '');
       if (!alive) c += ' is-dead';
       else if (suspects.length > 1 && suspects.length <= 3) c += ' is-suspect';
+      if (away && !declaring) c += ' is-away';
       if (named === i) c += ' is-named';
-      var b = h('button', { class: c, type: 'button' }, [
+      var b = h('button', {
+        class: c, type: 'button',
+        title: away ? (declaring ? 'You can accuse it from here' : 'Out on the floor \u2014 go and fetch it') : ''
+      }, [
         h('span', { text: C.itemIcon }),
         h('span', { text: puzzle.codes[i] })
       ]);
@@ -307,14 +408,28 @@
     function paint() {
       suspects = suspectItems(puzzle);
 
-      PS.ui.clear(panL); PS.ui.clear(panR); PS.ui.clear(tray);
+      PS.ui.clear(panL); PS.ui.clear(panR); PS.ui.clear(tray); PS.ui.clear(floorBox);
       panL.appendChild(h('div', { class: 'pz-scale-pan__lab', text: 'Left pan \u00B7 ' + puzzle.left.length }));
       panR.appendChild(h('div', { class: 'pz-scale-pan__lab', text: 'Right pan \u00B7 ' + puzzle.right.length }));
 
-      var i;
+      var i, loose = 0, hands = 0;
       for (i = 0; i < puzzle.left.length; i++) panL.appendChild(chip(puzzle.left[i]));
       for (i = 0; i < puzzle.right.length; i++) panR.appendChild(chip(puzzle.right[i]));
-      for (i = 0; i < puzzle.n; i++) if (where(i) === 'tray') tray.appendChild(chip(i));
+      for (i = 0; i < puzzle.n; i++) {
+        if (where(i) !== 'tray') continue;
+        if (inHand(i)) { tray.appendChild(chip(i)); hands++; }
+        else { floorBox.appendChild(chip(i)); loose++; }
+      }
+      if (!hands) {
+        tray.appendChild(h('div', { class: 'pz-scale-log__empty', text: arena
+          ? 'Empty hands. Nothing goes on the beam until you have gone and got it.'
+          : '' }));
+      }
+      if (!loose) {
+        floorBox.appendChild(h('div', { class: 'pz-scale-log__empty', text:
+          arena ? 'Nothing left out there \u2014 the whole batch is on you.' : '' }));
+      }
+      floorCard.style.display = arena ? '' : 'none';
 
       panL.className = 'pz-scale-pan pz-scale-pan--l' + (puzzle.left.length ? ' is-over' : '');
       panR.className = 'pz-scale-pan pz-scale-pan--r' + (puzzle.right.length ? ' is-over' : '');
@@ -326,6 +441,16 @@
       paintMeter();
       paintLog();
       paintDeclare();
+      paintHud();
+    }
+
+    function paintHud() {
+      if (!arena) return;
+      var left = puzzle.budget - puzzle.log.length;
+      if (hudWeigh) hudWeigh.set(left / puzzle.budget * 100, left + ' of ' + puzzle.budget, left <= 1 ? 'warn' : null);
+      if (hudHands) hudHands.set(handCount() + ' of ' + puzzle.n);
+      if (hudSuspect) hudSuspect.set(String(suspects.length), suspects.length === 1 ? 'good' : null);
+      if (hudCalls) hudCalls.set(puzzle.wrongGuesses + ' of ' + puzzle.maxWrong, puzzle.wrongGuesses ? 'bad' : null);
     }
 
     function paintMeter() {
@@ -333,6 +458,7 @@
       var left = puzzle.budget - puzzle.log.length;
       PS.ui.append(meter, [
         row('Batch', puzzle.n + ' ' + C.units),
+        row('In your hands', handCount() + ' of ' + puzzle.n, arena && handCount() === 0),
         row('Weighings left', left + ' of ' + puzzle.budget, left <= 1),
         row('Fault direction', puzzle.known ? (puzzle.heavy ? 'runs heavy' : 'runs light') : 'unstated', !puzzle.known),
         row('Still suspect', suspects.length + ' of ' + puzzle.n),
@@ -346,6 +472,9 @@
       } else if (left === 0 && !finished) {
         warnBox.appendChild(h('div', { class: 'pz-scale-warn' },
           ['The balance has nothing left to tell you. Whatever you know now is all you get.']));
+      } else if (arena && handCount() < 2 && !finished) {
+        warnBox.appendChild(h('div', { class: 'pz-scale-warn' },
+          ['You are holding almost nothing. The beam cannot compare what you did not carry over.']));
       }
 
       function row(k, v, hot) {
@@ -433,6 +562,7 @@
 
       api.tweak({ energy: -2 });
       puzzle.left = []; puzzle.right = [];
+      if (arena && rigStation) { rigStation.pulse(); arena.shake(r === 'even' ? 2 : 4, 0.25); }
       paint();
 
       if (suspects.length === 1 && puzzle.log.length < puzzle.budget) {
@@ -458,6 +588,7 @@
       named = null;
       api.tweak({ health: -(5 + puzzle.tier * 2), morale: -6, energy: -3 });
       api.toast(C.wrongIt, 'bad', 4200);
+      if (arena) { arena.hit('#e2695f'); arena.shake(7, 0.4); }
 
       if (puzzle.wrongGuesses >= puzzle.maxWrong) { finished = true; renderLoss(); return; }
       declaring = false;
@@ -483,6 +614,7 @@
           branchBtn(C.branchB, tight)
         ])
       ]);
+      if (rigStation) rigStation.solve();
       api.flash();
     }
 
@@ -556,6 +688,68 @@
       });
     }
 
+    /* ============================================================== WORLD == */
+    /* The batch is on the floor of a room and the balance is a place in it. */
+
+    function takeRack(rack, handle) {
+      if (finished) return;
+      var got = [];
+      for (var k = 0; k < rack.items.length; k++) {
+        if (held[rack.items[k]]) continue;
+        held[rack.items[k]] = true;
+        got.push(puzzle.codes[rack.items[k]]);
+      }
+      if (!got.length) return;
+      api.toast('You pick up ' + got.join(', ') + '.', 'good', 2600);
+      if (handle) handle.remove();
+      if (rigStation) rigStation.pulse();
+      paint();
+    }
+
+    function buildWorld() {
+      var plan = floorPlan(puzzle);
+
+      arena = PS.arena.create(el, {
+        map: { w: plan.w, h: plan.h, tiles: plan.tiles },
+        spawn: plan.spawn,
+        avatar: C.avatar || '\uD83E\uDDCD',
+        light: state.stats.light
+      });
+      if (!arena) return false;
+      teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
+
+      hudWeigh = arena.meter('Weighings', '\u2696\uFE0F');
+      hudHands = arena.chip('In hand', '\uD83E\uDD1A');
+      hudSuspect = arena.chip('Suspect', '\u2753');
+      hudCalls = arena.chip('Bad calls', '\u2716');
+
+      for (var i = 0; i < plan.racks.length; i++) addRack(plan.racks[i]);
+
+      rigStation = arena.station({
+        x: plan.rig.x, y: plan.rig.y, icon: C.rigIcon, label: 'The ' + C.rig,
+        hint: 'set the beam up here', radius: 1.45, emits: 2.2,
+        onEnter: function (panelEl) { PS.ui.append(panelEl, panelStack); },
+        onOpen: function () { paint(); }
+      });
+
+      arena.note(C.roomNote);
+      arena.button('\u21A9 Take the batch untested', walkAway, 'pz-btn--danger');
+      arena.focus();
+      return true;
+    }
+
+    function addRack(rack) {
+      var labels = [];
+      for (var k = 0; k < rack.items.length; k++) labels.push(puzzle.codes[rack.items[k]]);
+      arena.prop({
+        x: rack.x, y: rack.y, icon: C.rackIcon,
+        label: PS.state.prettify(C.rackName) + ' \u00B7 ' + labels.join(' '),
+        hint: rack.items.length === 1 ? 'pick it up' : 'pick up all ' + rack.items.length,
+        emits: 0.85,
+        onActivate: function (a, handle) { takeRack(rack, handle); }
+      });
+    }
+
     /* ------------------------------------------------------------- layout -- */
 
     weighBtn.addEventListener('click', doWeigh);
@@ -577,39 +771,46 @@
       verdict
     ]);
 
-    PS.ui.append(shell, [
-      h('div', { class: 'pz-col' }, [
-        rig,
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'The batch' }),
-          tray
-        ]),
-        h('div', { class: 'pz-note' }, [
-          'Click a ', C.unit, ' to send it left, again for right, again to put it back. ',
-          h('strong', { text: 'Both pans must hold the same number' }),
-          ' \u2014 an uneven beam proves nothing.'
-        ]),
-        h('div', { class: 'pz-row' }, [weighBtn, clearBtn, declareBtn])
-      ]),
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'The ' + C.rig }),
-          meter
-        ]),
-        warnBox,
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'Weighings' }),
-          logBox
-        ]),
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'Call it' }),
-          declareBox
-        ]),
-        walkBtn
-      ])
+    var handsCard = h('div', { class: 'pz-card' }, [
+      h('div', { class: 'pz-card__head', text: 'The batch' }), tray
+    ]);
+    var howNote = h('div', { class: 'pz-note' }, [
+      'Click a ', C.unit, ' to send it left, again for right, again to put it back. ',
+      h('strong', { text: 'Both pans must hold the same number' }),
+      ' \u2014 an uneven beam proves nothing.'
+    ]);
+    var buttonRow = h('div', { class: 'pz-row' }, [weighBtn, clearBtn, declareBtn]);
+    var rigCard = h('div', { class: 'pz-card' }, [
+      h('div', { class: 'pz-card__head', text: 'The ' + C.rig }), meter
+    ]);
+    var logCard = h('div', { class: 'pz-card' }, [
+      h('div', { class: 'pz-card__head', text: 'Weighings' }), logBox
+    ]);
+    var callCard = h('div', { class: 'pz-card' }, [
+      h('div', { class: 'pz-card__head', text: 'Call it' }), declareBox
     ]);
 
-    PS.ui.append(el, shell);
+    /* Built once. The station hands these exact nodes back every time you come
+       to the beam, so a half-loaded pair of pans survives walking off. */
+    var panelStack = h('div', { class: 'pz-scale-rigcol' }, [
+      rig, handsCard, floorCard, howNote, buttonRow, rigCard, warnBox, logCard, callCard
+    ]);
+
+    var arenaOk = false;
+    if (PS.arena && typeof PS.arena.create === 'function') {
+      try { arenaOk = buildWorld(); }
+      catch (e) { arenaOk = false; if (root.console) console.warn('[e07] arena failed, falling back', e); }
+    }
+
+    if (!arenaOk) {
+      /* Degraded mode: the original bench, whole batch already to hand. */
+      arena = null;
+      PS.ui.append(shell, [
+        h('div', { class: 'pz-col' }, [rig, handsCard, floorCard, howNote, buttonRow]),
+        h('div', { class: 'pz-col' }, [rigCard, warnBox, logCard, callCard, walkBtn])
+      ]);
+      PS.ui.append(el, shell);
+    }
 
     verdict.textContent = puzzle.known ? (puzzle.heavy ? C.lineHeavy : C.lineLight) : C.lineBlind;
     paint();

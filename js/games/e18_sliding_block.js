@@ -4,10 +4,15 @@
    Self-contained: logic + 3 skins + its own CSS. No DOM access until mount().
 
    THE PUZZLE
-     Rush Hour. A yard packed with things too heavy to lift and just light
-     enough to shove along their own length. One of them is the thing you
-     actually need — an ambulance, a loaded pallet, a punt — and it has to
-     reach the gap in the right-hand wall. Nothing passes through anything.
+     Rush Hour, played from inside it. A yard packed with things too heavy to
+     lift and just light enough to shove along their own length. One of them is
+     the thing you actually need — an ambulance, a loaded pallet, a punt — and
+     it has to reach the gap in the right-hand wall. Nothing passes through
+     anything, and nothing turns.
+
+     You walk the yard yourself. Which end of a thing you are standing at is
+     which way it goes when you put your shoulder into it, which is a far
+     better interface than picking a piece and then picking a direction.
 
    GENERATION — REVERSE SEARCH, THEN PROOF
      Random boards are usually either trivial or impossible, and you cannot
@@ -509,72 +514,76 @@
     return r ? r.path : null;
   }
 
+  /* ====================================================== ARENA GEOMETRY ==
+     You are not looking down at the yard any more, you are standing in it.
+     Every board cell becomes one tile with a one-tile aisle between cells, so
+     a 2-long vehicle is three tiles of solid metal and there is always room to
+     walk down the side of it. Board cell v -> tile 2 + 2v; the outer ring of
+     the yard is always clear, so the perimeter can never be cut off.
+
+     PUSH HANDLES
+     The tile immediately off each end of a piece is provably always free — it
+     could only be covered by a horizontal piece spanning both the cell we end
+     on and the one beyond, and we are the piece on that cell. So each piece
+     gets a standing spot at each end, and which one you are standing on is
+     what decides which way the thing goes when you put your shoulder into it. */
+
+  function cellTile(v) { return 2 + v * 2; }
+  function yardW(n) { return 2 * n + 3; }
+
+  function yardPlan(n) {
+    var w = yardW(n), tiles = [], x, y;
+    for (y = 0; y < w; y++) {
+      tiles.push([]);
+      for (x = 0; x < w; x++) {
+        tiles[y].push((x === 0 || y === 0 || x === w - 1 || y === w - 1) ? 1 : 0);
+      }
+    }
+    return { w: w, h: w, tiles: tiles };
+  }
+
+  /** A yard under floodlights. The jam is the puzzle; the dark is not. */
+  function arenaRadius(light) {
+    var l = light < 0 ? 0 : (light > 100 ? 100 : light);
+    return 3.8 + (l / 100) * 2.6;
+  }
+
+  function dirWord(horiz, dir) {
+    return horiz ? (dir > 0 ? 'right' : 'left') : (dir > 0 ? 'down' : 'up');
+  }
+
+  /** Where you stand to push piece i in direction dir, in tile coords. */
+  function handTile(puzzle, i, dir) {
+    var p = puzzle.pieces[i], v = puzzle.vars[i];
+    var along = dir > 0 ? cellTile(v) - 1 : cellTile(v + p.len - 1) + 1;
+    return p.horiz ? { x: along, y: cellTile(p.fixed) } : { x: cellTile(p.fixed), y: along };
+  }
+
   /* ================================================================ CSS == */
 
   var CSS = [
-    '.pz-slide{display:grid;grid-template-columns:minmax(0,1fr) minmax(228px,286px);gap:18px;align-items:start}',
-    '@media (max-width:860px){.pz-slide{grid-template-columns:1fr}}',
+    '.pz-slide{display:flex;flex-direction:column;gap:12px}',
 
-    '.pz-slide-frame{position:relative;width:100%;max-width:520px;margin:0 auto;padding:10px 24px 10px 10px}',
-    '.pz-slide-board{position:relative;width:100%;aspect-ratio:1/1;border-radius:12px;',
-    '  background:linear-gradient(160deg,#0a0d13,#05070a);border:1px solid var(--line);',
-    '  box-shadow:inset 0 0 60px rgba(0,0,0,.85),var(--sh-1);touch-action:none}',
+    '.pz-slide-tips{display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:12px;color:var(--dim);line-height:1.6}',
+    '.pz-slide-tips strong{color:var(--text-2);font-weight:600}',
+    '.pz-slide-cap{font-family:var(--font-mono);font-size:10.5px;padding:2px 7px;border-radius:5px;',
+    '  background:#0c1016;border:1px solid var(--line);border-bottom-width:2px;color:var(--text-2)}',
 
-    '.pz-slide-grid{position:absolute;inset:0;display:grid;padding:4px;gap:2px}',
-    '.pz-slide-cell{border-radius:4px;background:#0d1119;border:1px solid #141a24;padding:0;',
-    '  transition:background .18s var(--ease),border-color .18s var(--ease)}',
-    '.pz-slide-cell.is-lane{background:#111825}',
-    '.pz-slide-cell.is-drop{cursor:pointer;background:var(--acc-wash);',
-    '  border-color:color-mix(in srgb,var(--acc) 45%,transparent)}',
-    '.pz-slide-cell.is-drop:hover{background:color-mix(in srgb,var(--acc) 24%,#0d1119)}',
+    '.pz-slide-legend{display:flex;flex-wrap:wrap;gap:11px;font-size:11px;color:var(--dim)}',
+    '.pz-slide-legend span{display:inline-flex;gap:5px;align-items:center}',
 
-    '.pz-slide-layer{position:absolute;inset:4px;pointer-events:none}',
-    '.pz-slide-piece{position:absolute;padding:0;border:0;background:transparent;pointer-events:auto;',
-    '  cursor:grab;transition:left .16s var(--ease),top .16s var(--ease);z-index:2}',
-    '.pz-slide-piece.is-drag{transition:none;cursor:grabbing;z-index:5}',
-    '.pz-slide-piece__in{position:absolute;inset:2px;border-radius:7px;display:grid;place-items:center;',
-    '  font-size:clamp(11px,3vw,22px);line-height:1;color:var(--text-2);',
-    '  background:linear-gradient(165deg,var(--panel-3),var(--panel));',
-    '  border:1px solid var(--line);box-shadow:0 4px 12px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.05);',
-    '  transition:border-color .18s var(--ease),box-shadow .18s var(--ease),transform .2s var(--ease)}',
-    '.pz-slide-piece:hover .pz-slide-piece__in{border-color:color-mix(in srgb,var(--acc) 60%,var(--line))}',
-    '.pz-slide-piece.is-sel .pz-slide-piece__in{border-color:var(--acc);',
-    '  box-shadow:0 0 0 1px var(--acc),0 6px 20px var(--acc-glow)}',
-    '.pz-slide-piece.is-target .pz-slide-piece__in{color:var(--text);',
-    '  background:linear-gradient(165deg,color-mix(in srgb,var(--acc) 34%,var(--panel-3)),',
-    '  color-mix(in srgb,var(--acc) 12%,var(--panel)));border-color:color-mix(in srgb,var(--acc) 70%,var(--line))}',
-    '.pz-slide-piece.is-stuck .pz-slide-piece__in{animation:pzSlideNudge .32s var(--ease)}',
-    '@keyframes pzSlideNudge{0%,100%{transform:translate(0,0)}30%{transform:translate(-3px,0)}65%{transform:translate(3px,0)}}',
-
-    '.pz-slide-exit{position:absolute;right:-22px;width:22px;display:grid;place-items:center;',
-    '  font-size:15px;color:var(--acc-2);pointer-events:none}',
-    '.pz-slide-exit::before{content:"";position:absolute;left:-5px;top:8%;bottom:8%;width:3px;border-radius:2px;',
-    '  background:linear-gradient(180deg,transparent,var(--acc),transparent);box-shadow:0 0 12px var(--acc-glow)}',
-    '.pz-slide-board.is-open .pz-slide-exit{animation:pzSlideOpen .9s var(--ease)}',
-    '@keyframes pzSlideOpen{0%{transform:scale(1)}40%{transform:scale(1.55)}100%{transform:scale(1)}}',
-
-    '.pz-slide-pad{display:grid;grid-template-columns:repeat(3,42px);grid-template-rows:repeat(3,42px);',
-    '  gap:6px;justify-content:center}',
-    '.pz-slide-pad button{border-radius:9px;border:1px solid var(--line);font-size:14px;',
-    '  background:linear-gradient(180deg,var(--panel-3),var(--panel-2));color:var(--text)}',
-    '.pz-slide-pad button:hover:not(:disabled){border-color:var(--acc)}',
-    '.pz-slide-pad button:disabled{opacity:.22}',
-    '.pz-slide-pad .pz-slide-sp{visibility:hidden}',
-
-    '.pz-slide-read{display:flex;flex-direction:column;gap:6px}',
-    '.pz-slide-read__row{display:flex;justify-content:space-between;gap:10px;',
-    '  font-family:var(--font-mono);font-size:11px;color:var(--dim)}',
-    '.pz-slide-read__row b{color:var(--acc-2);font-weight:700}',
-    '.pz-slide-read__row.is-par b{color:var(--good)}',
-    '.pz-slide-read__row.is-over b{color:var(--warn)}',
-
-    '.pz-slide-sel{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--text-2);',
-    '  padding:8px 10px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line-soft)}',
-    '.pz-slide-sel__i{font-size:19px;line-height:1}',
-    '.pz-slide-sel__d{color:var(--dim);font-size:11px}',
-
-    '.pz-slide-legend{display:flex;flex-wrap:wrap;gap:9px;font-size:11px;color:var(--dim)}',
-    '.pz-slide-legend span{display:inline-flex;gap:5px;align-items:center}'
+    '.pz-slide-hand{display:flex;align-items:center;gap:11px;min-height:62px;padding:10px 12px;border-radius:10px;',
+    '  background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);',
+    '  transition:border-color .18s var(--ease)}',
+    '.pz-slide-hand.is-target{border-color:color-mix(in srgb,var(--acc) 62%,transparent);',
+    '  box-shadow:0 0 0 1px color-mix(in srgb,var(--acc) 18%,transparent)}',
+    '.pz-slide-hand.is-stuck{border-color:rgba(226,105,95,.5)}',
+    '.pz-slide-hand__i{font-size:22px;line-height:1}',
+    '.pz-slide-hand__t{font-size:13px;font-weight:600;color:var(--text);line-height:1.3}',
+    '.pz-slide-hand__d{font-size:11.5px;color:var(--dim);line-height:1.45}',
+    '.pz-slide-hand__d b{color:var(--acc-2);font-weight:600}',
+    '.pz-slide-hand__d.is-bad b{color:var(--bad)}',
+    '.pz-slide-hand__idle{font-size:12px;line-height:1.5;color:var(--dim)}'
   ].join('\n');
 
   /* =============================================================== MOUNT == */
@@ -585,263 +594,346 @@
     var h = PS.ui.h;
     var C = puzzle.content;
     var n = puzzle.n;
+    var W = yardW(n);
+    var laneY = cellTile(puzzle.exitRow);
     var finished = false;
-    var sel = 0;
+    var arena = null;
 
-    var pieceEls = [];
-    var cellEls = [];
+    var bodies = [];                    // [piece][cell] -> prop handle
+    var handles = [];                   // [piece] -> { fwd, back } prop handles
+    var hand = { piece: -1, dir: 0, play: -1 };
 
-    var board = h('div', { class: 'pz-slide-board' });
-    var gridLayer = h('div', {
-      class: 'pz-slide-grid',
-      style: { gridTemplateColumns: 'repeat(' + n + ',1fr)', gridTemplateRows: 'repeat(' + n + ',1fr)' }
-    });
-    var pieceLayer = h('div', { class: 'pz-slide-layer' });
+    var stage = h('div', {});
+    var handBox = h('div', { class: 'pz-slide-hand' });
+    var endBox = h('div', { class: 'pz-col' });
 
-    for (var y = 0; y < n; y++) {
-      for (var x = 0; x < n; x++) {
-        (function (cx, cy) {
-          var c = h('button', { type: 'button', class: 'pz-slide-cell' });
-          c.addEventListener('click', function () { onCell(cx, cy); });
-          cellEls.push({ el: c, x: cx, y: cy });
-          gridLayer.appendChild(c);
-        })(x, y);
-      }
-    }
-
-    board.appendChild(gridLayer);
-    board.appendChild(pieceLayer);
-    board.appendChild(h('div', {
-      class: 'pz-slide-exit',
-      style: { top: (puzzle.exitRow / n * 100) + '%', height: (100 / n) + '%' },
-      text: C.exitIcon
-    }));
-
-    for (var i = 0; i < puzzle.pieces.length; i++) {
-      (function (idx) {
-        var p = puzzle.pieces[idx];
-        var btn = h('button', {
-          type: 'button',
-          class: 'pz-slide-piece' + (idx === 0 ? ' is-target' : ''),
-          title: (idx === 0 ? C.targetName : C.blockerName) + ' \u00B7 ' +
-                 (p.horiz ? 'slides left and right' : 'slides up and down')
-        }, [h('div', { class: 'pz-slide-piece__in', text: p.icon })]);
-        btn.addEventListener('click', function () { select(idx); });
-        btn.addEventListener('pointerdown', function (ev) { beginDrag(ev, idx); });
-        pieceEls.push(btn);
-        pieceLayer.appendChild(btn);
-      })(i);
-    }
-
-    /* ------------------------------------------------------------ readout -- */
-    var read = h('div', { class: 'pz-slide-read' });
-    var selBox = h('div', {});
-    var padBtns = {};
-    var controls = h('div', { class: 'pz-col' });
-
-    function pct(v) { return (v / n * 100) + '%'; }
-
-    function place(idx) {
-      var p = puzzle.pieces[idx], v = puzzle.vars[idx], e = pieceEls[idx];
-      e.style.left = pct(p.horiz ? v : p.fixed);
-      e.style.top = pct(p.horiz ? p.fixed : v);
-      e.style.width = pct(p.horiz ? p.len : 1);
-      e.style.height = pct(p.horiz ? 1 : p.len);
-    }
-
-    function paint() {
-      for (var k = 0; k < puzzle.pieces.length; k++) {
-        place(k);
-        pieceEls[k].className = 'pz-slide-piece' + (k === 0 ? ' is-target' : '') + (k === sel ? ' is-sel' : '');
-        pieceEls[k].disabled = finished;
-      }
-
-      var range = finished ? null : freeRange(puzzle, sel);
-      var p = puzzle.pieces[sel];
-      var occ = occOf(puzzle.pieces, puzzle.vars, n);
-
-      for (var ci = 0; ci < cellEls.length; ci++) {
-        var cell = cellEls[ci];
-        var cls = 'pz-slide-cell';
-        if (cell.y === puzzle.exitRow) cls += ' is-lane';
-        var drop = false;
-        if (range && occ[cell.y * n + cell.x] === -1) {
-          // Legal drop: same axis as the selection, inside its free range.
-          if (p.horiz && cell.y === p.fixed && cell.x >= range.lo && cell.x <= range.hi) drop = true;
-          if (!p.horiz && cell.x === p.fixed && cell.y >= range.lo && cell.y <= range.hi) drop = true;
-        }
-        if (drop) cls += ' is-drop';
-        cell.el.className = cls;
-        cell.el.disabled = finished || !drop;
-      }
-
-      paintRead(range);
-    }
-
-    function paintRead(range) {
-      PS.ui.clear(read);
-      var par = puzzle.moves <= puzzle.optimal;
-      PS.ui.append(read, [
-        row('Moves made', String(puzzle.moves), puzzle.moves === 0 ? '' : (par ? 'is-par' : 'is-over')),
-        row(puzzle.exact ? 'Known minimum' : 'Known route', puzzle.optimal + ' moves', ''),
-        row('Obstructions', String(puzzle.pieces.length - 1), ''),
-        row('Resets', String(puzzle.resets), '')
-      ]);
-
-      PS.ui.clear(selBox);
-      var p = puzzle.pieces[sel];
-      var play = range ? Math.max(0, range.hi - range.lo) : 0;
-      selBox.appendChild(h('div', { class: 'pz-slide-sel' }, [
-        h('div', { class: 'pz-slide-sel__i', text: p.icon }),
-        h('div', {}, [
-          h('div', { text: PS.state.prettify(sel === 0 ? C.targetName : C.blockerName) }),
-          h('div', {
-            class: 'pz-slide-sel__d',
-            text: (p.horiz ? 'Slides left and right' : 'Slides up and down')
-              + (range ? ' \u00B7 ' + (play ? play + ' cells of play' : 'wedged solid') : '')
-          })
+    PS.ui.append(el, h('div', { class: 'pz-slide' }, [
+      stage,
+      h('div', { class: 'pz-slide-tips' }, [
+        h('span', {}, [
+          h('b', { class: 'pz-slide-cap', text: 'W A S D' }), ' / ',
+          h('b', { class: 'pz-slide-cap', text: '\u2190\u2191\u2193\u2192' }),
+          ' walk the yard \u00B7 hold or click the ', h('strong', { text: 'mouse' }), ' to go there \u00B7 ',
+          h('b', { class: 'pz-slide-cap', text: 'E' }), ' puts your shoulder into it, ',
+          h('strong', { text: 'away from wherever you are standing' })
+        ]),
+        h('div', { class: 'pz-slide-legend' }, [
+          h('span', {}, [C.targetIcon, ' ' + C.targetName]),
+          h('span', {}, [C.blockers[1], ' ' + C.blockerName]),
+          h('span', {}, ['\u27A1\uFE0F', ' somewhere to push from']),
+          h('span', {}, [C.exitIcon, ' ' + C.exitName])
         ])
-      ]));
+      ]),
+      handBox, endBox
+    ]));
 
-      if (!finished) {
-        var r = range || freeRange(puzzle, sel);
-        padBtns.left.disabled  = !(p.horiz && puzzle.vars[sel] > r.lo);
-        padBtns.right.disabled = !(p.horiz && puzzle.vars[sel] < r.hi);
-        padBtns.up.disabled    = !(!p.horiz && puzzle.vars[sel] > r.lo);
-        padBtns.down.disabled  = !(!p.horiz && puzzle.vars[sel] < r.hi);
+    /* ------------------------------------------------------- degraded mode -- */
+    if (!PS.arena || typeof PS.arena.create !== 'function') {
+      PS.ui.append(stage, h('div', { class: 'pz-intro', text: C.arrive }));
+      PS.ui.append(endBox, h('div', { class: 'pz-choices' }, [choiceBtn(C.a), choiceBtn(C.b)]));
+      return;
+    }
+
+    /* -------------------------------------------------------------- arena -- */
+
+    arena = PS.arena.create(stage, {
+      map: yardPlan(n),
+      spawn: { x: 1, y: laneY },
+      avatar: '\uD83E\uDDCD',
+      light: state.stats.light,
+      lightCurve: arenaRadius,
+      darkness: 0.86,
+      memory: 0.42,
+      onTick: trackHand
+    });
+    if (!arena) return;
+    teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
+
+    arena.revealAll();
+
+    /* --------------------------------------------------------------- HUD --- */
+
+    var mMoves = arena.meter('Moves', '\uD83D\uDC63');
+    var cMin = arena.chip(puzzle.exact ? 'Minimum' : 'Known route', '\uD83E\uDDE0');
+    var cJam = arena.chip('In the way', C.blockers[1]);
+    var cResets = arena.chip('Resets', '\u21BA');
+
+    arena.note('Everything slides along its own length only and nothing passes through anything. Stand at one end of a thing and press E.');
+    arena.button('\u21BA Reset the yard', reset);
+    arena.button('\uD83D\uDCA5 Force it', forceIt, 'pz-btn--danger');
+
+    /* --------------------------------------------------------- the yard --- */
+
+    for (var pi = 0; pi < puzzle.pieces.length; pi++) addPiece(pi);
+
+    // The lane out, marked at both ends so it reads from anywhere in the yard.
+    arena.prop({
+      x: W - 2, y: laneY, icon: C.exitIcon, label: PS.state.prettify(C.exitName),
+      hint: 'the way out', trigger: 'press', once: false, botSkip: true,
+      radius: 0.55, glow: true, emits: 2.1,
+      onActivate: function () {
+        api.toast(puzzle.solved
+          ? C.arrive
+          : 'The gap is right there. The ' + C.targetName + ' is what has to come through it.', 'info', 2400);
+      }
+    });
+    arena.prop({
+      x: 1, y: laneY, icon: C.exitIcon, label: PS.state.prettify(C.lane),
+      trigger: 'press', once: false, botSkip: true,
+      radius: 0.001, glow: false, emits: 0.9
+    });
+
+    function addPiece(i) {
+      var p = puzzle.pieces[i], row = [], k;
+
+      for (k = 0; k < p.len; k++) {
+        // The body is what you see and what blocks you. It is never the thing
+        // E talks to — the handles at the ends are, and that is the point.
+        row.push(arena.prop({
+          x: 0, y: 0, icon: p.icon,
+          label: PS.state.prettify(i === 0 ? C.targetName : C.blockerName),
+          trigger: 'press', once: false, botSkip: true,
+          radius: 0.001, glow: i === 0, emits: i === 0 ? 1.3 : 0,
+          tint: i === 0 ? null : '#8592a6'
+        }));
+      }
+      bodies.push(row);
+      handles.push({ fwd: addHandle(i, 1), back: addHandle(i, -1) });
+    }
+
+    function addHandle(i, dir) {
+      var p = puzzle.pieces[i];
+      return arena.prop({
+        x: 0, y: 0,
+        icon: p.horiz ? (dir > 0 ? '\u27A1\uFE0F' : '\u2B05\uFE0F') : (dir > 0 ? '\u2B07\uFE0F' : '\u2B06\uFE0F'),
+        label: PS.state.prettify(i === 0 ? C.targetName : C.blockerName),
+        hint: 'E \u00B7 shove it ' + dirWord(p.horiz, dir),
+        trigger: 'press', once: false,
+        radius: 0.78, glow: false, emits: 0,
+        onActivate: function () { shove(i, dir); }
+      });
+    }
+
+    /* --------------------------------------------------------- the board -- */
+
+    /**
+     * Lay the yard out. Bodies are trivial; handles need one piece of care.
+     * Two pieces sitting flush on the same line share the tile between them —
+     * one end of each — and a shared spot would make one of those two shoves
+     * unreachable, which can make a solvable jam unsolvable. So a handle that
+     * lands on a taken tile steps one tile sideways, onto the aisle crossings
+     * at odd/odd, which no piece can ever cover.
+     */
+    function place() {
+      var claim = {}, want = [], i, k, w;
+
+      for (i = 0; i < puzzle.pieces.length; i++) {
+        var p = puzzle.pieces[i], v = puzzle.vars[i];
+        for (k = 0; k < p.len; k++) {
+          if (p.horiz) bodies[i][k].move(cellTile(v + k), cellTile(p.fixed));
+          else bodies[i][k].move(cellTile(p.fixed), cellTile(v + k));
+        }
+        want.push({ i: i, dir: 1, t: handTile(puzzle, i, 1) });
+        want.push({ i: i, dir: -1, t: handTile(puzzle, i, -1) });
       }
 
-      function row(k, v, cls) {
-        return h('div', { class: 'pz-slide-read__row ' + (cls || '') },
-          [h('span', { text: k }), h('b', { text: v })]);
+      for (w = 0; w < want.length; w++) {
+        var it = want[w];
+        if (claim[it.t.x + ',' + it.t.y]) {
+          var horiz = puzzle.pieces[it.i].horiz;
+          var alts = horiz
+            ? [{ x: it.t.x, y: it.t.y - 1 }, { x: it.t.x, y: it.t.y + 1 }]
+            : [{ x: it.t.x - 1, y: it.t.y }, { x: it.t.x + 1, y: it.t.y }];
+          for (var a = 0; a < alts.length; a++) {
+            if (!claim[alts[a].x + ',' + alts[a].y]) { it.t = alts[a]; break; }
+          }
+        }
+        claim[it.t.x + ',' + it.t.y] = 1;
+        (it.dir > 0 ? handles[it.i].fwd : handles[it.i].back).move(it.t.x, it.t.y);
       }
     }
 
-    /* -------------------------------------------------------------- moving */
-
-    function select(idx) {
-      if (finished) return;
-      sel = idx;
-      paint();
+    /** Re-lay the yard's collision. Everything a piece covers is solid metal,
+        including the aisle tile running through the middle of its length. */
+    function paintSolids() {
+      var x, y, i, k;
+      for (y = 2; y <= 2 * n; y++) {
+        for (x = 2; x <= 2 * n; x++) arena.setTile(x, y, false);
+      }
+      for (i = 0; i < puzzle.pieces.length; i++) {
+        var p = puzzle.pieces[i], v = puzzle.vars[i];
+        var a = cellTile(v), b = cellTile(v + p.len - 1);
+        for (k = a; k <= b; k++) {
+          if (p.horiz) arena.setTile(k, cellTile(p.fixed), true);
+          else arena.setTile(cellTile(p.fixed), k, true);
+        }
+      }
     }
 
-    function nudge(idx) {
-      var e = pieceEls[idx];
-      e.classList.remove('is-stuck');
-      void e.offsetWidth;
-      e.classList.add('is-stuck');
+    /* ------------------------------------------------------------ shoving - */
+
+    function shove(idx, dir) {
+      if (finished || puzzle.solved) return;
+      slideTo(idx, puzzle.vars[idx] + dir);
     }
 
-    /** Slide a piece to `to` along its own axis. Costs |to - from| moves. */
+    /** The one mutation point. One move per cell, exactly as it always was, so
+        the proven minimum on the panel still means what it says. */
     function slideTo(idx, to) {
       if (finished || puzzle.solved) return;
+      var p = puzzle.pieces[idx];
       var r = freeRange(puzzle, idx);
-      if (to < r.lo || to > r.hi) { nudge(idx); api.toast(C.blockedLine, 'bad', 1200); return; }
+      if (to < r.lo || to > r.hi) {
+        api.toast(C.blockedLine, 'bad', 1200);
+        if (arena) {
+          arena.shake(3, 0.24);
+          arena.dust(p.horiz ? cellTile(puzzle.vars[idx]) : cellTile(p.fixed),
+                     p.horiz ? cellTile(p.fixed) : cellTile(puzzle.vars[idx]), 6, '#e2695f');
+        }
+        return;
+      }
       var delta = Math.abs(to - puzzle.vars[idx]);
       if (!delta) return;
 
       puzzle.vars[idx] = to;
       puzzle.moves += delta;
-      sel = idx;
 
       // Shoving weight around is work. Cheap per move, but a long flail adds
       // up — which is exactly the pressure that rewards planning first.
       api.tweak({ energy: -delta });
+
+      place();
+      paintSolids();
+      if (arena) {
+        arena.dust(p.horiz ? cellTile(to) : cellTile(p.fixed),
+                   p.horiz ? cellTile(p.fixed) : cellTile(to), 5, '#f6d08a');
+      }
       paint();
       if (isSolved(puzzle)) onSolved();
     }
 
-    function step(idx, dir) { slideTo(idx, puzzle.vars[idx] + dir); }
+    /* ------------------------------------------------------------- render -- */
 
-    function onCell(x, y) {
-      if (finished) return;
-      var p = puzzle.pieces[sel];
-      if (p.horiz && y === p.fixed) slideTo(sel, x);
-      else if (!p.horiz && x === p.fixed) slideTo(sel, y);
-    }
+    function paint() {
+      if (!arena) return;
+      var i, k, r, fwdRoom, backRoom;
 
-    /* --------------------------------------------------------------- drag -- */
-    /* Dragging is the natural verb here. It is clamped to the piece's legal
-       range, so a drag can never produce an illegal board. */
-
-    var drag = null;
-
-    function beginDrag(ev, idx) {
-      if (finished || puzzle.solved) return;
-      select(idx);
-      var rect = board.getBoundingClientRect();
-      var cellPx = rect.width / n;
-      if (!cellPx) return;
-      drag = {
-        idx: idx, x: ev.clientX, y: ev.clientY, from: puzzle.vars[idx],
-        cell: cellPx, range: freeRange(puzzle, idx)
-      };
-      pieceEls[idx].classList.add('is-drag');
-    }
-
-    function onPointerMove(ev) {
-      if (!drag) return;
-      var p = puzzle.pieces[drag.idx];
-      var raw = p.horiz ? (ev.clientX - drag.x) : (ev.clientY - drag.y);
-      var to = Math.max(drag.range.lo, Math.min(drag.range.hi, drag.from + Math.round(raw / drag.cell)));
-      if (puzzle.vars[drag.idx] === to) return;
-      puzzle.vars[drag.idx] = to;
-      place(drag.idx);
-    }
-
-    function onPointerUp() {
-      if (!drag) return;
-      var d = drag;
-      drag = null;
-      pieceEls[d.idx].classList.remove('is-drag');
-      var to = puzzle.vars[d.idx];
-      puzzle.vars[d.idx] = d.from;                  // rewind, then commit properly
-      if (to !== d.from) slideTo(d.idx, to);
-      else { place(d.idx); paint(); }
-    }
-
-    document.addEventListener('pointermove', onPointerMove);
-    document.addEventListener('pointerup', onPointerUp);
-    document.addEventListener('pointercancel', onPointerUp);
-    teardownFns.push(function () {
-      document.removeEventListener('pointermove', onPointerMove);
-      document.removeEventListener('pointerup', onPointerUp);
-      document.removeEventListener('pointercancel', onPointerUp);
-    });
-
-    /* ----------------------------------------------------------- keyboard -- */
-
-    function onKey(ev) {
-      if (finished) return;
-      var map = { ArrowLeft: [-1, true], ArrowRight: [1, true], ArrowUp: [-1, false], ArrowDown: [1, false] };
-      var m = map[ev.key];
-      if (!m) return;
-      if (puzzle.pieces[sel].horiz !== m[1]) return;
-      ev.preventDefault();
-      step(sel, m[0]);
-    }
-    document.addEventListener('keydown', onKey);
-    teardownFns.push(function () { document.removeEventListener('keydown', onKey); });
-
-    /* --------------------------------------------------------------- pad -- */
-
-    function pad() {
-      function b(key, label, dir, horiz) {
-        var btn = h('button', { type: 'button', text: label, title: 'Shift the selection' });
-        btn.addEventListener('click', function () {
-          if (puzzle.pieces[sel].horiz !== horiz) return;
-          step(sel, dir);
-        });
-        padBtns[key] = btn;
-        return btn;
+      for (i = 0; i < puzzle.pieces.length; i++) {
+        r = freeRange(puzzle, i);
+        fwdRoom = puzzle.vars[i] < r.hi;
+        backRoom = puzzle.vars[i] > r.lo;
+        for (k = 0; k < bodies[i].length; k++) {
+          bodies[i][k].raw.tint = i === 0 ? null : ((fwdRoom || backRoom) ? '#8592a6' : '#4a5464');
+        }
+        dressHandle(handles[i].fwd, i, 1, fwdRoom);
+        dressHandle(handles[i].back, i, -1, backRoom);
       }
-      var sp = function () { return h('div', { class: 'pz-slide-sp' }); };
-      return h('div', { class: 'pz-slide-pad' }, [
-        sp(), b('up', '\u25B2', -1, false), sp(),
-        b('left', '\u25C0', -1, true), sp(), b('right', '\u25B6', 1, true),
-        sp(), b('down', '\u25BC', 1, false), sp()
+
+      var par = puzzle.moves <= puzzle.optimal;
+      mMoves.set(Math.min(100, (puzzle.moves / Math.max(1, puzzle.optimal)) * 100),
+        puzzle.moves + ' / ' + puzzle.optimal, puzzle.moves === 0 ? null : (par ? 'good' : 'bad'));
+      cMin.set(puzzle.optimal + ' moves');
+      cJam.set(String(puzzle.pieces.length - 1));
+      cResets.set(String(puzzle.resets));
+
+      paintHand(true);
+    }
+
+    function dressHandle(hnd, i, dir, canGo) {
+      var p = puzzle.pieces[i];
+      hnd.raw.tint = canGo ? (i === 0 ? null : '#c7b48a') : '#3d4654';
+      hnd.raw.hint = canGo ? 'E \u00B7 shove it ' + dirWord(p.horiz, dir) : 'nothing that way';
+    }
+
+    /* ------------------------------------------- what you are standing at -- */
+
+    function trackHand(dt, a) {
+      if (finished || puzzle.solved || !a) return;
+      var pl = a.player();
+      var best = -1, bestDir = 0, bestD = 0.95, i, k, d;
+
+      for (i = 0; i < puzzle.pieces.length; i++) {
+        d = dist(handles[i].fwd, pl);
+        if (d < bestD) { bestD = d; best = i; bestDir = 1; }
+        d = dist(handles[i].back, pl);
+        if (d < bestD) { bestD = d; best = i; bestDir = -1; }
+      }
+
+      if (best < 0) {                       // not at a handle: what are we beside?
+        bestD = 1.5;
+        for (i = 0; i < puzzle.pieces.length; i++) {
+          for (k = 0; k < bodies[i].length; k++) {
+            d = dist(bodies[i][k], pl);
+            if (d < bestD) { bestD = d; best = i; bestDir = 0; }
+          }
+        }
+      }
+
+      var play = -1;
+      if (best >= 0) play = roomFor(best, bestDir);
+      if (best !== hand.piece || bestDir !== hand.dir || play !== hand.play) {
+        hand.piece = best; hand.dir = bestDir; hand.play = play;
+        paintHand(false);
+      }
+    }
+
+    function roomFor(i, dir) {
+      var r = freeRange(puzzle, i);
+      if (!dir) return r.hi - r.lo;
+      return dir > 0 ? r.hi - puzzle.vars[i] : puzzle.vars[i] - r.lo;
+    }
+
+    function dist(hnd, pl) {
+      var dx = (hnd.x + 0.5) - pl.x, dy = (hnd.y + 0.5) - pl.y;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function paintHand(refresh) {
+      if (finished || puzzle.solved) return;
+      if (refresh && hand.piece >= 0) hand.play = roomFor(hand.piece, hand.dir);
+
+      PS.ui.clear(handBox);
+      if (hand.piece < 0) {
+        handBox.className = 'pz-slide-hand';
+        handBox.appendChild(h('div', { class: 'pz-slide-hand__idle' },
+          ['Walk to one end of anything in the yard \u2014 the arrow on the floor is where you stand to push it that way.']));
+        return;
+      }
+
+      var i = hand.piece;
+      var p = puzzle.pieces[i];
+      var isTarget = i === 0;
+      var stuck = hand.play === 0;
+
+      handBox.className = 'pz-slide-hand' + (isTarget ? ' is-target' : '') + (stuck ? ' is-stuck' : '');
+
+      var line;
+      if (!hand.dir) {
+        line = h('span', {}, [
+          stuck ? 'Wedged solid from both ends. ' : 'It has room in it. ',
+          'You are alongside it \u2014 get to one ', h('b', { text: 'end' }), ' to move it.'
+        ]);
+      } else if (stuck) {
+        line = h('span', {}, ['Nothing doing ', h('b', { text: dirWord(p.horiz, hand.dir) }),
+          '. Something else has to move first.']);
+      } else {
+        line = h('span', {}, ['Press ', h('b', { text: 'E' }), ' and it goes ',
+          h('b', { text: dirWord(p.horiz, hand.dir) }), ' \u00B7 ',
+          h('b', { text: String(hand.play) }), ' cell' + (hand.play === 1 ? '' : 's') + ' of room that way']);
+      }
+
+      PS.ui.append(handBox, [
+        h('div', { class: 'pz-slide-hand__i', text: p.icon }),
+        h('div', {}, [
+          h('div', { class: 'pz-slide-hand__t',
+            text: PS.state.prettify(isTarget ? C.targetName : C.blockerName) +
+              (p.horiz ? ' \u2014 slides left and right' : ' \u2014 slides up and down') }),
+          h('div', { class: 'pz-slide-hand__d' + (stuck ? ' is-bad' : '') }, [line])
+        ])
       ]);
     }
+
+    /* ------------------------------------------------------------ endings -- */
 
     function reset() {
       if (finished || puzzle.solved) return;
@@ -850,23 +942,34 @@
       puzzle.resets++;
       api.tweak({ morale: -2 });
       api.toast('Everything back where it started. Think it through this time.', 'info', 2200);
+      if (arena) {
+        place();
+        paintSolids();
+        arena.stop();
+        arena.teleport(1, laneY);        // the yard moved around you; step out of it
+      }
+      hand.piece = -1; hand.dir = 0; hand.play = -1;
       paint();
     }
 
-    /* ------------------------------------------------------------ endings -- */
-
     function onSolved() {
       puzzle.solved = true;
-      board.classList.add('is-open');
       api.toast(C.solvedLine, 'good', 3000);
-      renderChoice();
       api.flash();
+      if (arena) {
+        arena.setTile(W - 1, laneY, false);          // the gate stands open
+        arena.ping(W - 1, laneY);
+        arena.dust(2 * n, laneY, 14, '#f6d08a');
+        arena.shake(4, 0.35);
+      }
+      renderChoice();
     }
 
     function renderChoice() {
-      PS.ui.clear(controls);
+      PS.ui.clear(handBox);
+      PS.ui.clear(endBox);
       var par = puzzle.moves <= puzzle.optimal;
-      PS.ui.append(controls, [
+      PS.ui.append(endBox, [
         h('div', { class: 'pz-intro' }, [
           C.arrive + ' You did it in ' + puzzle.moves + ' move' + (puzzle.moves === 1 ? '' : 's') + '; ',
           h('em', { text: (puzzle.exact ? 'the minimum is ' : 'a known route is ') + puzzle.optimal }),
@@ -926,37 +1029,10 @@
       });
     }
 
-    /* ------------------------------------------------------------- layout -- */
-
-    PS.ui.append(controls, [
-      pad(),
-      h('div', { class: 'pz-slide-legend' }, [
-        h('span', {}, [C.targetIcon, ' ' + C.targetName]),
-        h('span', {}, [C.blockers[1], ' ' + C.blockerName]),
-        h('span', {}, [C.exitIcon, ' ' + C.exitName])
-      ]),
-      h('div', { class: 'pz-row' }, [
-        h('button', { class: 'pz-btn pz-btn--sm', type: 'button', onclick: reset }, ['\u21BA Reset']),
-        h('button', { class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button', onclick: forceIt }, ['\uD83D\uDCA5 Force it'])
-      ])
-    ]);
-
-    PS.ui.append(el, h('div', { class: 'pz-slide' }, [
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-slide-frame' }, [board]),
-        h('div', { class: 'pz-note' }, [
-          'Drag a piece, or click it and use the arrows. Everything slides only along its own length \u2014 get the ',
-          h('strong', { text: C.targetName }), ' out through ', h('strong', { text: C.exitName }), '.'
-        ])
-      ]),
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'The jam' }), read]),
-        selBox,
-        h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'Shift' }), controls])
-      ])
-    ]));
-
+    place();
+    paintSolids();
     paint();
+    arena.focus();
   }
 
   function unmount() {

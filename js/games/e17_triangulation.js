@@ -22,6 +22,15 @@
             put your own sensor down. Generation proves at least one
             placement collapses the answer to a single cell.
 
+   HOW YOU TOUCH IT
+     The plot is a place. Every listening station stands on the square its
+     reading came from and it will not tell you anything until you have
+     walked to it — reaching one hands over its range and paints its ring
+     across your map. The spare sets are in a cache you have to go and pick
+     up, and you plant one by standing where you want it. The crossing
+     itself is still done at the plot table, because arithmetic is a thing
+     you do sitting down.
+
    THE BRANCH
      Knowing where it is, you either go straight to it or mark it and call it.
    ========================================================================== */
@@ -43,6 +52,9 @@
       stationName: 'relay', stationPlural: 'relays', stationIcon: '\uD83D\uDCE1',
       sensorName: 'repeater', sensorIcon: '\uD83D\uDCCD',
       targetName: 'the beacon', targetIcon: '\uD83D\uDD34',
+      avatar: '\uD83E\uDDD7', tableIcon: '\uD83D\uDDFA\uFE0F', tableName: 'Chart table',
+      cacheIcon: '\uD83C\uDF92', cacheName: 'Repeater cache',
+      walkNote: 'Every relay is out there on the hill. Walk to one and it gives you its range.',
       goal: 'The beacon is transmitting and every relay on the ridge can hear it. None of them can say which way.',
       deployLine: 'You climb, plant the repeater, and wait for it to lock.',
       hitFirst: 'Dead on. The beacon is exactly where the numbers said it was.',
@@ -56,6 +68,9 @@
       stationName: 'mast', stationPlural: 'masts', stationIcon: '\uD83D\uDCF6',
       sensorName: 'scanner', sensorIcon: '\uD83D\uDCCD',
       targetName: 'the handset', targetIcon: '\uD83D\uDCF1',
+      avatar: '\uD83E\uDDCD', tableIcon: '\uD83D\uDCBB', tableName: 'Trace desk',
+      cacheIcon: '\uD83E\uDDF0', cacheName: 'Scanner case',
+      walkNote: 'Each mast is a climb across the block. Reach one and it hands over its range.',
       goal: 'The handset is still registering. Each mast knows how far, not which way.',
       deployLine: 'You set the scanner on a parapet and let it take its own reading.',
       hitFirst: 'First guess. The handset is in that building and it is still on.',
@@ -69,6 +84,9 @@
       stationName: 'hydrophone', stationPlural: 'hydrophones', stationIcon: '\uD83C\uDF0A',
       sensorName: 'drop buoy', sensorIcon: '\uD83D\uDCCD',
       targetName: 'the pinger', targetIcon: '\uD83D\uDD0A',
+      avatar: '\uD83E\uDDCD', tableIcon: '\uD83D\uDCCB', tableName: 'Plot table',
+      cacheIcon: '\uD83E\uDDF0', cacheName: 'Buoy locker',
+      walkNote: 'Every hydrophone is a run across the plot. Come alongside one and it gives you its range.',
       goal: 'The pinger is running on its last battery. Every hydrophone gets a range and none of them get a bearing.',
       deployLine: 'The buoy goes over the side and starts returning its own range.',
       hitFirst: 'Straight onto it. The plot was right the first time.',
@@ -295,6 +313,127 @@
 
   function ref(p, r, c) { return COLS.charAt(c) + (r + 1); }
 
+  /* ============================================================== GROUND == */
+  /* The plot is walkable ground. Terrain is derived from the puzzle itself so
+     a given seed always lays out the same way with no extra rng, and every
+     obstacle is only kept if the whole field is still one connected piece —
+     nothing is ever allowed to fence a station off. */
+
+  var RING_COLS = ['#e2a84e', '#5fcf8d', '#6fb3e0', '#c98ae0'];
+  var STEP4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+
+  function terrainSeed(p) {
+    var v = p.w * 7919 + p.h * 104729 + (p.target[0] + 1) * 1543 + (p.target[1] + 1) * 3079;
+    for (var i = 0; i < p.readings.length; i++) {
+      v = (v * 31 + p.readings[i].row * 17 + p.readings[i].col * 7 + Math.round(p.readings[i].value * 100)) % 2147483647;
+    }
+    return v;
+  }
+
+  /** Minstd. Deterministic, self-contained, and never Math.random. */
+  function lcg(seed) {
+    var s = seed % 2147483647;
+    if (s <= 0) s += 2147483646;
+    return function () { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+  }
+
+  function allConnected(tiles, W, H) {
+    var total = 0, sx = -1, sy = -1, x, y;
+    for (y = 0; y < H; y++) {
+      for (x = 0; x < W; x++) {
+        if (tiles[y][x]) continue;
+        total++; if (sx < 0) { sx = x; sy = y; }
+      }
+    }
+    if (!total) return false;
+    var seen = {}, q = [[sx, sy]], head = 0, n = 0;
+    seen[sx + ',' + sy] = 1;
+    while (head < q.length) {
+      var c = q[head++]; n++;
+      for (var i = 0; i < 4; i++) {
+        var nx = c[0] + STEP4[i][0], ny = c[1] + STEP4[i][1];
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H || tiles[ny][nx]) continue;
+        var k = nx + ',' + ny;
+        if (seen[k]) continue;
+        seen[k] = 1; q.push([nx, ny]);
+      }
+    }
+    return n === total;
+  }
+
+  function terrainFor(p) {
+    var W = p.w, H = p.h, x, y, row;
+    var tiles = [];
+    for (y = 0; y < H; y++) { row = []; for (x = 0; x < W; x++) row.push(0); tiles.push(row); }
+
+    var keep = {};
+    keep[p.target[0] + ',' + p.target[1]] = 1;
+    for (var i = 0; i < p.readings.length; i++) keep[p.readings[i].row + ',' + p.readings[i].col] = 1;
+
+    var rand = lcg(terrainSeed(p));
+    var want = Math.round(W * H * 0.11), placed = 0, guard = 0;
+    while (placed < want && guard < W * H * 8) {
+      guard++;
+      x = Math.min(W - 1, Math.floor(rand() * W));
+      y = Math.min(H - 1, Math.floor(rand() * H));
+      if (keep[y + ',' + x] || tiles[y][x]) continue;
+      tiles[y][x] = 1;
+      if (allConnected(tiles, W, H)) placed++;
+      else tiles[y][x] = 0;
+    }
+    return tiles;
+  }
+
+  function stepMap(tiles, W, H, sx, sy) {
+    var d = {}, q = [[sx, sy]], head = 0;
+    d[sx + ',' + sy] = 0;
+    while (head < q.length) {
+      var c = q[head++];
+      for (var i = 0; i < 4; i++) {
+        var nx = c[0] + STEP4[i][0], ny = c[1] + STEP4[i][1];
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H || tiles[ny][nx]) continue;
+        var k = nx + ',' + ny;
+        if (d[k] !== undefined) continue;
+        d[k] = d[c[0] + ',' + c[1]] + 1;
+        q.push([nx, ny]);
+      }
+    }
+    return d;
+  }
+
+  /** Start as far from every station as the ground allows — walking is the point. */
+  function spawnFor(p, tiles) {
+    var best = null, bestScore = -1;
+    for (var y = 0; y < p.h; y++) {
+      for (var x = 0; x < p.w; x++) {
+        if (tiles[y][x] || isTarget(p, y, x)) continue;
+        var near = 1e9;
+        for (var i = 0; i < p.readings.length; i++) {
+          var d = dist(y, x, p.readings[i].row, p.readings[i].col);
+          if (d < near) near = d;
+        }
+        if (near > bestScore) { bestScore = near; best = { x: x, y: y }; }
+      }
+    }
+    return best || { x: 0, y: 0 };
+  }
+
+  /** First open square at one of `wanted` step-distances from the start. */
+  function siteAt(p, tiles, dists, wanted, skip) {
+    for (var i = 0; i < wanted.length; i++) {
+      for (var y = 0; y < p.h; y++) {
+        for (var x = 0; x < p.w; x++) {
+          if (tiles[y][x]) continue;
+          var k = x + ',' + y;
+          if (dists[k] !== wanted[i]) continue;
+          if (skip && skip[k]) continue;
+          return { x: x, y: y };
+        }
+      }
+    }
+    return null;
+  }
+
   /* ================================================================ CSS == */
 
   var CSS = [
@@ -357,7 +496,12 @@
     '.pz-tri-note.is-bad{color:var(--bad);background:rgba(226,105,95,.08);border-color:rgba(226,105,95,.28)}',
 
     '.pz-tri-legend{display:flex;flex-wrap:wrap;gap:9px;font-size:11px;color:var(--dim)}',
-    '.pz-tri-legend span{display:inline-flex;gap:5px;align-items:center}'
+    '.pz-tri-legend span{display:inline-flex;gap:5px;align-items:center}',
+
+    '.pz-tri-panel{display:flex;flex-direction:column;gap:12px}',
+    '.pz-tri-station.is-locked{opacity:.45;cursor:default;border-style:dashed}',
+    '.pz-tri-station.is-locked:hover{border-color:var(--line)}',
+    '.pz-tri-station.is-locked .pz-tri-read{color:var(--dimmer)}'
   ].join('\n');
 
   /* ================================================================ MOUNT = */
@@ -370,6 +514,24 @@
     var W = puzzle.w, H = puzzle.h;
     var finished = false;
     var armed = false;
+
+    var arena = null;
+    var known = {};          // reading index -> its station has actually been reached
+    var carrying = 0;        // spare sets on your back
+    var plotStation = null;
+    var hudRanges = null, hudFits = null, hudSets = null, hudPlots = null;
+
+    /** Nothing is on the plot until you have stood next to the thing that measured it. */
+    function isKnown(i) { return arena ? !!known[i] : true; }
+
+    function knownReadings() {
+      var out = [];
+      for (var i = 0; i < puzzle.readings.length; i++) if (isKnown(i)) out.push(puzzle.readings[i]);
+      return out;
+    }
+
+    /** liveCandidates(), but only across the ranges you have actually collected. */
+    function fittingCells() { return matching(H, W, knownReadings()); }
 
     var cellEls = [];
     var grid = h('div', {
@@ -412,6 +574,7 @@
         return;
       }
       puzzle.pick = [r, c];
+      if (arena) arena.ping(c, r);
       paint();
     }
 
@@ -420,9 +583,12 @@
       puzzle.sensorsLeft--;
       puzzle.sensorsUsed++;
       puzzle.readings.push(makeReading(r, c, dist(r, c, puzzle.target[0], puzzle.target[1]), 0, api.rng, 'sensor'));
-      puzzle.lit[puzzle.readings.length - 1] = true;
+      var idx = puzzle.readings.length - 1;
+      puzzle.lit[idx] = true;
+      known[idx] = true;
       api.tweak({ energy: -5 });
       api.toast(C.deployLine, 'good');
+      if (arena) { markSensor(idx); revealRing(idx); }
       paint();
     }
 
@@ -443,7 +609,7 @@
 
     function paint() {
       var lits = [];
-      for (var i = 0; i < puzzle.readings.length; i++) if (puzzle.lit[i]) lits.push(i);
+      for (var i = 0; i < puzzle.readings.length; i++) if (puzzle.lit[i] && isKnown(i)) lits.push(i);
 
       // Which cells sit inside every lit ring, and how badly each one misses.
       var cand = {}, lo = Infinity, hi = -Infinity, k;
@@ -469,6 +635,7 @@
 
       var occ = {};
       for (i = 0; i < puzzle.readings.length; i++) {
+        if (!isKnown(i)) continue;
         occ[puzzle.readings[i].row + ',' + puzzle.readings[i].col] = i;
       }
       var missed = {};
@@ -519,6 +686,17 @@
       paintList();
       paintRows();
       paintNote();
+      paintHud();
+    }
+
+    function paintHud() {
+      if (!arena) return;
+      var got = knownReadings().length;
+      var fits = fittingCells().length;
+      if (hudRanges) hudRanges.set(got + ' / ' + puzzle.readings.length, got ? null : 'warn');
+      if (hudFits) hudFits.set(got ? String(fits) : '\u2014', fits === 1 && got ? 'good' : null);
+      if (hudSets) hudSets.set(carrying + ' held \u00B7 ' + puzzle.sensorsLeft + ' left');
+      if (hudPlots) hudPlots.set(String(puzzle.guessesLeft), puzzle.guessesLeft < 2 ? 'warn' : null);
     }
 
     function paintList() {
@@ -526,19 +704,21 @@
       for (var i = 0; i < puzzle.readings.length; i++) {
         (function (idx) {
           var rd = puzzle.readings[idx];
+          var got = isKnown(idx);
           var name = (rd.kind === 'sensor' ? C.sensorName : C.stationName) + ' ' + ref(puzzle, rd.row, rd.col);
           var btn = h('button', {
-            class: 'pz-tri-station' + (puzzle.lit[idx] ? '' : ' is-off'),
+            class: 'pz-tri-station' + (got ? (puzzle.lit[idx] ? '' : ' is-off') : ' is-locked'),
             type: 'button', 'data-act': 'ring:' + idx,
-            title: 'Show or hide this ring',
-            onclick: function () { toggleRing(idx); }
+            disabled: !got,
+            title: got ? 'Show or hide this ring' : 'Walk to it before it will tell you anything',
+            onclick: function () { if (got) toggleRing(idx); }
           }, [
             h('div', { class: 'pz-tri-swatch is-b' + (idx % 4) }),
             h('div', {}, [
               h('b', { text: PS.state.prettify(name) }),
-              h('span', { text: rd.noisy ? 'drifting \u00B1' + puzzle.noise.toFixed(2) : 'calibrated' })
+              h('span', { text: got ? (rd.noisy ? 'drifting \u00B1' + puzzle.noise.toFixed(2) : 'calibrated') : 'not reached' })
             ]),
-            h('div', { class: 'pz-tri-read', text: rd.value.toFixed(2) })
+            h('div', { class: 'pz-tri-read', text: got ? rd.value.toFixed(2) : '\u2013\u2013\u2013' })
           ]);
           list.appendChild(btn);
         })(i);
@@ -547,12 +727,13 @@
 
     function paintRows() {
       PS.ui.clear(rows);
-      var live = liveCandidates(puzzle).length;
+      var got = knownReadings().length;
+      var live = fittingCells().length;
       PS.ui.append(rows, [
         rowOf('Grid', W + ' \u00D7 ' + H + ' ' + C.unit),
-        rowOf('Readings', String(puzzle.readings.length)),
-        rowOf('Cells that fit', String(live), live === 1 ? 'solo' : (live > 1 ? 'many' : '')),
-        rowOf('Sets in hand', String(puzzle.sensorsLeft)),
+        rowOf('Readings', got + ' of ' + puzzle.readings.length, got ? '' : 'many'),
+        rowOf('Cells that fit', got ? String(live) : '\u2014', got && live === 1 ? 'solo' : (got && live > 1 ? 'many' : '')),
+        rowOf('Sets in hand', String(arena ? carrying : puzzle.sensorsLeft)),
         rowOf('Plots left', String(puzzle.guessesLeft)),
         rowOf('Marked', puzzle.pick ? ref(puzzle, puzzle.pick[0], puzzle.pick[1]) : '\u2014')
       ]);
@@ -572,7 +753,17 @@
           'Pick a square for the ' + C.sensorName + '. Put it somewhere the cells that still fit are all different distances away, or it tells you nothing.' }));
         return;
       }
-      var live = liveCandidates(puzzle).length;
+
+      var got = knownReadings().length;
+      if (arena && got < puzzle.readings.length) {
+        noteBox.appendChild(h('div', { class: 'pz-tri-note', text: got === 0
+          ? 'The plot is empty. Nothing on this table knows anything until you have walked out to a ' + C.stationName + ' and read it.'
+          : (puzzle.readings.length - got) + ' more ' + (puzzle.readings.length - got === 1 ? C.stationName : C.stationPlural) +
+            ' out there have not been reached. One range is a circle, not a fix.' }));
+        return;
+      }
+
+      var live = fittingCells().length;
       if (live === 1) {
         noteBox.appendChild(h('div', { class: 'pz-tri-note', text:
           'Exactly one square satisfies every reading. Mark it and commit.' }));
@@ -599,6 +790,7 @@
         puzzle.done = true;
         puzzle.revealed = true;
         var first = puzzle.guessesLeft === 1;
+        revealTarget();
         paint();
         PS.ui.clear(controls);
         PS.ui.append(controls, [
@@ -606,6 +798,7 @@
             PS.state.prettify(C.targetName) + ' is at ' + ref(puzzle, r, c) + '.' }),
           h('div', { class: 'pz-choices' }, [choiceBtn(C.go, 'sprint'), choiceBtn(C.call, 'signal')])
         ]);
+        if (plotStation) plotStation.solve();
         api.flash();
         return;
       }
@@ -616,6 +809,7 @@
       if (puzzle.guessesLeft > 0) {
         api.tweak({ energy: -4, morale: -3 });
         api.toast('Nothing at ' + ref(puzzle, r, c) + '. You were ' + off.toFixed(2) + ' ' + C.unit + ' out.', 'bad');
+        if (arena) { arena.hit('#e2695f'); arena.ping(c, r, '#e2695f'); }
         paint();
         return;
       }
@@ -666,6 +860,7 @@
       finished = true;
       puzzle.done = true;
       puzzle.revealed = true;
+      revealTarget();
       paint();
       PS.ui.clear(controls);
       controls.appendChild(h('div', { class: 'pz-intro', text:
@@ -687,6 +882,7 @@
       finished = true;
       puzzle.done = true;
       puzzle.revealed = true;
+      revealTarget();
       paint();
       api.finish({
         outcome: 'fail',
@@ -705,14 +901,154 @@
     }
 
     /* ------------------------------------------------------------ keyboard */
+    /* Only bound in degraded mode — the arena owns Enter and Space for
+       "interact", and two things answering one key is a bug. */
 
     function onKey(ev) {
       if (finished || puzzle.done) return;
       if (ev.key === 'Enter') { ev.preventDefault(); commit(); return; }
       if (ev.key === 'Escape') { armed = false; puzzle.pick = null; paint(); }
     }
-    document.addEventListener('keydown', onKey);
-    teardownFns.push(function () { document.removeEventListener('keydown', onKey); });
+
+    /* ============================================================== WORLD == */
+    /* Ranges are things you go and collect. The table only crosses them. */
+
+    function revealRing(i) {
+      if (!arena) return;
+      var rd = puzzle.readings[i], cells = [], r, c;
+      for (r = 0; r < H; r++) {
+        for (c = 0; c < W; c++) if (within(rd, r, c)) cells.push([r, c]);
+      }
+      var every = Math.max(1, Math.ceil(cells.length / 7));
+      for (var k = 0; k < cells.length; k++) {
+        arena.reveal(cells[k][1], cells[k][0], 0.4);
+        if (k % every === 0) arena.ping(cells[k][1], cells[k][0], RING_COLS[i % 4]);
+      }
+    }
+
+    function markSensor(i) {
+      if (!arena) return;
+      var rd = puzzle.readings[i];
+      arena.prop({
+        x: rd.col, y: rd.row, icon: C.sensorIcon,
+        label: PS.state.prettify(C.sensorName + ' ' + ref(puzzle, rd.row, rd.col)),
+        hint: 'reads ' + rd.value.toFixed(2) + ' ' + C.unit,
+        trigger: 'press', once: false, botSkip: true, emits: 1, tint: RING_COLS[i % 4],
+        onActivate: function () {
+          api.toast(PS.state.prettify(C.sensorName) + ' at ' + ref(puzzle, rd.row, rd.col) +
+            ' is holding ' + rd.value.toFixed(2) + ' ' + C.unit + '.', 'info');
+        }
+      });
+    }
+
+    function reachStation(i) {
+      if (finished || known[i]) return;
+      known[i] = true;
+      var rd = puzzle.readings[i];
+      api.toast(PS.state.prettify(C.stationName) + ' ' + ref(puzzle, rd.row, rd.col) + ' gives you ' +
+        rd.value.toFixed(2) + ' ' + C.unit + (rd.noisy ? ', and it is drifting.' : ', dead calibrated.'), 'good');
+      revealRing(i);
+      if (plotStation) plotStation.pulse();
+      paint();
+    }
+
+    function revealTarget() {
+      if (!arena) return;
+      var tr = puzzle.target[0], tc = puzzle.target[1];
+      arena.reveal(tc, tr, 2.4);
+      arena.ping(tc, tr, '#5fcf8d');
+      arena.prop({
+        x: tc, y: tr, icon: C.targetIcon, label: PS.state.prettify(C.targetName),
+        hint: 'there it is', trigger: 'press', once: false, botSkip: true, emits: 2.2, tint: '#5fcf8d',
+        onActivate: function () { api.toast(PS.state.prettify(C.targetName) + ' is right here.', 'good'); }
+      });
+    }
+
+    function plantHere() {
+      if (finished || puzzle.done || !arena) return;
+      if (puzzle.sensorsLeft <= 0) { api.toast('You have no sets left to put out.', 'bad'); return; }
+      if (carrying <= 0) {
+        api.toast('The spare sets are still in the ' + C.cacheName.toLowerCase() + '. Go and pick one up.', 'bad');
+        return;
+      }
+      var me = arena.player();
+      var r = me.ty, c = me.tx;
+      if (occupied(puzzle)[r + ',' + c]) { api.toast('There is already a set on that square.', 'bad'); return; }
+      carrying--;
+      deploy(r, c);
+    }
+
+    function buildWorld() {
+      var tiles = terrainFor(puzzle);
+      var start = spawnFor(puzzle, tiles);
+      var dists = stepMap(tiles, W, H, start.x, start.y);
+
+      var reserved = {};
+      reserved[puzzle.target[0] + ',' + puzzle.target[1]] = 1;
+      for (var i = 0; i < puzzle.readings.length; i++) {
+        reserved[puzzle.readings[i].col + ',' + puzzle.readings[i].row] = 1;
+      }
+      reserved[start.x + ',' + start.y] = 1;
+
+      var table = siteAt(puzzle, tiles, dists, [2, 3, 1, 4], reserved) || start;
+      reserved[table.x + ',' + table.y] = 1;
+      var cache = siteAt(puzzle, tiles, dists, [4, 3, 5, 2, 6], reserved) || table;
+
+      arena = PS.arena.create(el, {
+        map: { w: W, h: H, tiles: tiles },
+        spawn: start,
+        avatar: C.avatar || '\uD83E\uDDCD',
+        light: state.stats.light
+      });
+      if (!arena) return false;
+      teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
+
+      hudRanges = arena.chip('Ranges', C.stationIcon);
+      hudFits = arena.chip('Fits', '\u25CE');
+      hudPlots = arena.chip('Plots', '\u2316');
+      if (puzzle.sensorsLeft > 0) hudSets = arena.chip('Sets', C.sensorIcon);
+
+      for (i = 0; i < puzzle.readings.length; i++) addStationProp(i);
+
+      if (puzzle.sensorsLeft > 0) {
+        arena.prop({
+          x: cache.x, y: cache.y, icon: C.cacheIcon, label: C.cacheName,
+          hint: 'take the spare sets', emits: 0.9, tint: '#e2a84e',
+          onActivate: function () {
+            if (finished) return;
+            carrying = puzzle.sensorsLeft;
+            api.toast('You sling ' + (carrying === 1 ? 'the spare ' + C.sensorName : carrying + ' spare ' + C.sensorName + 's') +
+              ' over your shoulder. Stand where you want it and put it down.', 'good');
+            paint();
+          }
+        });
+      }
+
+      plotStation = arena.station({
+        x: table.x, y: table.y, icon: C.tableIcon, label: C.tableName,
+        hint: 'cross the ranges here', radius: 1.4, emits: 2,
+        onEnter: function (panelEl) { PS.ui.append(panelEl, panelStack); },
+        onOpen: function () { paint(); }
+      });
+
+      arena.note(C.goal + ' ' + C.walkNote);
+      if (puzzle.sensorsLeft > 0) {
+        arena.button('\uD83D\uDCCD Put the ' + C.sensorName + ' down here', plantHere);
+      }
+      arena.button('\u21A9 Leave it unplotted', abandon, 'pz-btn--danger');
+      arena.focus();
+      return true;
+    }
+
+    function addStationProp(i) {
+      var rd = puzzle.readings[i];
+      arena.prop({
+        x: rd.col, y: rd.row, icon: C.stationIcon,
+        label: PS.state.prettify(C.stationName + ' ' + ref(puzzle, rd.row, rd.col)),
+        hint: 'walk in for its range', once: false, emits: 1.3, tint: RING_COLS[i % 4],
+        onActivate: function () { reachStation(i); }
+      });
+    }
 
     /* ------------------------------------------------------------- layout -- */
 
@@ -723,39 +1059,72 @@
         h('button', { class: 'pz-btn pz-btn--sm', type: 'button', 'data-act': 'all-off',
           onclick: function () { allRings(false); } }, ['Clear plot'])
       ]),
-      h('button', { class: 'pz-btn pz-btn--sm', type: 'button', 'data-act': 'deploy', onclick: armSensor },
-        ['\uD83D\uDCCD Put out a ' + C.sensorName]),
       h('button', { class: 'pz-btn pz-btn--primary', type: 'button', 'data-act': 'commit', onclick: commit },
-        ['Commit the fix']),
-      h('button', { class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button', 'data-act': 'giveup', onclick: abandon },
-        ['\u21A9 Leave it unplotted'])
+        ['Commit the fix'])
     ]);
 
-    PS.ui.append(el, h('div', { class: 'pz-tri' }, [
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-intro', text: C.goal }),
-        h('div', { class: 'pz-tri-plot' }, [grid]),
-        h('div', { class: 'pz-tri-legend' }, [
-          h('span', {}, [C.stationIcon, ' ' + C.stationName]),
-          h('span', {}, [C.sensorIcon, ' ' + C.sensorName]),
-          h('span', {}, ['\u2316 your mark']),
-          h('span', {}, [C.targetIcon, ' ' + C.targetName])
-        ]),
-        h('div', { class: 'pz-note' }, [
-          'Every lit ring paints the squares at that exact range. Squares inside ',
-          h('strong', { text: 'all' }),
-          ' of them are lit brightest. Click a square to mark it, then commit \u2014 you get two plots.'
-        ])
+    var plotCard = h('div', { class: 'pz-tri-plot' }, [grid]);
+    var legend = h('div', { class: 'pz-tri-legend' }, [
+      h('span', {}, [C.stationIcon, ' ' + C.stationName]),
+      h('span', {}, [C.sensorIcon, ' ' + C.sensorName]),
+      h('span', {}, ['\u2316 your mark']),
+      h('span', {}, [C.targetIcon, ' ' + C.targetName])
+    ]);
+
+    /* The whole plot surface, built once. The station hands these exact nodes
+       back every time you walk up to the table, so a half-made plot keeps. */
+    var panelStack = h('div', { class: 'pz-tri-panel' }, [
+      h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'Plot' }), rows]),
+      plotCard,
+      legend,
+      noteBox,
+      h('div', { class: 'pz-card' }, [
+        h('div', { class: 'pz-card__head', text: PS.state.prettify(C.stationPlural) }), list
       ]),
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'Plot' }), rows]),
-        noteBox,
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: PS.state.prettify(C.stationPlural) }), list
+      h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'Set' }), controls])
+    ]);
+
+    var arenaOk = false;
+    if (PS.arena && typeof PS.arena.create === 'function') {
+      try { arenaOk = buildWorld(); }
+      catch (e) { arenaOk = false; if (root.console) console.warn('[e17] arena failed, falling back', e); }
+    }
+
+    if (!arenaOk) {
+      /* Degraded mode: the original plot, all ranges already in hand. Never
+         let a missing layer strand the player in an unfinishable scene. */
+      arena = null;
+      PS.ui.append(controls, [
+        h('button', { class: 'pz-btn pz-btn--sm', type: 'button', 'data-act': 'deploy', onclick: armSensor },
+          ['\uD83D\uDCCD Put out a ' + C.sensorName]),
+        h('button', { class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button', 'data-act': 'giveup', onclick: abandon },
+          ['\u21A9 Leave it unplotted'])
+      ]);
+
+      document.addEventListener('keydown', onKey);
+      teardownFns.push(function () { document.removeEventListener('keydown', onKey); });
+
+      PS.ui.append(el, h('div', { class: 'pz-tri' }, [
+        h('div', { class: 'pz-col' }, [
+          h('div', { class: 'pz-intro', text: C.goal }),
+          plotCard,
+          legend,
+          h('div', { class: 'pz-note' }, [
+            'Every lit ring paints the squares at that exact range. Squares inside ',
+            h('strong', { text: 'all' }),
+            ' of them are lit brightest. Click a square to mark it, then commit \u2014 you get two plots.'
+          ])
         ]),
-        h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'Set' }), controls])
-      ])
-    ]));
+        h('div', { class: 'pz-col' }, [
+          h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'Plot' }), rows]),
+          noteBox,
+          h('div', { class: 'pz-card' }, [
+            h('div', { class: 'pz-card__head', text: PS.state.prettify(C.stationPlural) }), list
+          ]),
+          h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'Set' }), controls])
+        ])
+      ]));
+    }
 
     paint();
   }
