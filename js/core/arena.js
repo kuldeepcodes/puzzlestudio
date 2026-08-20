@@ -1317,6 +1317,15 @@
     /* ================================================================ LOOP */
 
     function frame(ts) {
+      // Two INDEPENDENT protections, not duplication — do not "tidy" either away.
+      // This guard stops a loop already in flight: if destroy() runs between a
+      // frame being scheduled and it firing, cancelAnimationFrame cannot
+      // un-schedule it, and without this line the loop would re-arm itself
+      // forever. The cancel in destroy() stops the frame that is merely
+      // pending. They defend against different mistakes, and removing either
+      // leaves every test still green — fault injection confirmed that
+      // deleting the cancel alone produces no observable leak at all, because
+      // this line quietly covers for it.
       if (destroyed) return;
       raf = root.requestAnimationFrame(frame);
       if (!last) last = ts;
@@ -1547,6 +1556,9 @@
         if (destroyed) return;
         destroyed = true;
         running = false;
+        // Pairs with the `if (destroyed) return;` at the top of frame(). This
+        // cancels a frame that is merely pending; that guard kills one already
+        // in flight. Both are needed — see the comment there.
         if (raf) root.cancelAnimationFrame(raf);
         raf = 0;
         document.removeEventListener('keydown', onKeyDown);

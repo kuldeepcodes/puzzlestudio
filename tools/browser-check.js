@@ -181,10 +181,20 @@ function cleanup() {
   ok(depthGrew, 'the bot actually played through several scenes',
     `depth went ${samples[0].depth} -> ${samples[samples.length - 1].depth}`);
 
-  // The real assertion: flat, not zero. One live arena is correct.
+  // *** THIS IS THE LOAD-BEARING ASSERTION. ***
+  // Flat, not zero — one live arena is correct. Fault injection (destroy()
+  // made a no-op) produces a clean 60 -> 120 -> 183 -> 240, exactly N x 60,
+  // and fails here.
+  //
+  // Nothing else in this file catches that leak. In particular the canvas
+  // check below PASSED throughout the injected failure: the canvas gets
+  // replaced while the orphaned loop keeps rendering, so canvas count is
+  // blind to it. If this assertion ever looks flaky, do not relax it and take
+  // comfort from the others — they are not covering for it.
   ok(last <= Math.max(90, first * 1.6), 'animation frames do not accumulate across scenes',
     `${first} frames/s early vs ${last} late — a leak would scale with scenes visited`);
 
+  // Cheap sanity, NOT leak detection — see above.
   ok(maxCanvas <= 1, 'at most one arena canvas is alive at a time',
     `saw ${maxCanvas} canvases in the document`);
 
