@@ -4,17 +4,20 @@
    Self-contained: logic + 3 skins + its own CSS. No DOM access until mount().
 
    THE PUZZLE
-     Stealth as a planning problem, not a reflex test. Nothing here is hidden
-     and nothing here is random. Every watchman walks a fixed loop, every beam
-     sweeps a fixed span, and all of it is drawn on the board before you move.
-     The world advances exactly one tick per action, and waiting in place is an
-     action — so the puzzle is not "can you react", it is "can you read the
-     cycles and step into the gap they leave".
+     Stealth in real time, but not a reflex test. Nothing here is hidden and
+     nothing here is random. Every watchman walks a fixed loop, every lamp
+     sweeps a fixed lane, and all of it is drawn in front of you — cones and
+     all — before you take a step. You cross the yard on your own two feet,
+     so the puzzle is not "can you react", it is "can you read the cycles and
+     move into the gap they leave". Standing still and watching is a move.
 
    GENERATION — SOLVED IN (PLACE, TIME), NOT IN PLACE
      A route that is safe cell-by-cell can still be a death trap, because the
      danger moves. So this engine never reasons about the grid alone: it
-     reasons about (x, y, tick mod period).
+     reasons about (x, y, tick mod period). That proof is what makes the yard
+     crossable, and the yard is tuned around it: you top out at five tiles a
+     second and the fastest thing watching you does 2.6, so the route the
+     solver proves exists is comfortably walkable with time to spare.
 
        1. Every patrol's cycle length is drawn from {4,6,8,12}, so the least
           common multiple — the tick at which the entire yard repeats — is
@@ -444,68 +447,88 @@
   }
 
   /* ================================================================ CSS == */
+  /* The yard itself is the arena's canvas. All this dresses is the strip of
+     briefing that sits under it. */
 
   var CSS = [
-    '.pz-patrol{display:grid;grid-template-columns:minmax(0,1fr) minmax(236px,300px);gap:18px;align-items:start}',
-    '@media (max-width:880px){.pz-patrol{grid-template-columns:1fr}}',
+    '.pz-patrol{display:flex;flex-direction:column;gap:12px}',
 
-    '.pz-patrol-board{display:grid;gap:3px;padding:11px;border-radius:12px;background:#06080c;',
-    '  border:1px solid var(--line);box-shadow:inset 0 0 60px rgba(0,0,0,.85);',
-    '  width:100%;max-width:520px;aspect-ratio:1/1;margin:0 auto}',
-    '.pz-patrol-cell{position:relative;display:grid;place-items:center;border-radius:5px;padding:0;',
-    '  font-size:clamp(10px,2.4vw,19px);line-height:1;background:#0c1017;border:1px solid #151b25;',
-    '  color:var(--text-2);transition:background .18s var(--ease),border-color .18s var(--ease)}',
-    '.pz-patrol-cell.is-wall{background:#1a2029;border-color:#232b37;color:var(--dimmer)}',
-    '.pz-patrol-cell.is-route{background:#111a24;border-color:#1e2c3a}',
-    '.pz-patrol-cell.is-soon::after{content:"";position:absolute;inset:3px;border-radius:3px;',
-    '  background:repeating-linear-gradient(45deg,transparent 0 3px,rgba(230,180,85,.30) 3px 6px);',
-    '  pointer-events:none}',
-    '.pz-patrol-cell.is-watch{background:rgba(226,105,95,.20);border-color:rgba(226,105,95,.55)}',
-    '.pz-patrol-cell.is-exit{color:var(--acc-2);border-color:color-mix(in srgb,var(--acc) 45%,transparent)}',
-    '.pz-patrol-cell.is-step{cursor:pointer}',
-    '.pz-patrol-cell.is-safe{border-color:var(--good);box-shadow:0 0 0 1px color-mix(in srgb,var(--good) 55%,transparent)}',
-    '.pz-patrol-cell.is-safe:hover{background:rgba(95,207,141,.16)}',
-    '.pz-patrol-cell.is-risk{border-color:var(--bad);box-shadow:0 0 0 1px color-mix(in srgb,var(--bad) 55%,transparent)}',
-    '.pz-patrol-cell.is-risk:hover{background:rgba(226,105,95,.20)}',
-    '.pz-patrol-cell.is-me{background:radial-gradient(circle,var(--acc-wash),transparent 70%);',
-    '  color:var(--text);box-shadow:0 0 20px var(--acc-glow);z-index:2}',
-    '.pz-patrol-cell.is-hit{animation:pzPatrolHit .55s var(--ease)}',
-    '@keyframes pzPatrolHit{0%,100%{background:#0c1017}35%{background:rgba(226,105,95,.65)}}',
+    '.pz-patrol-tips{display:flex;flex-wrap:wrap;gap:14px;align-items:center;',
+    '  font-size:12px;color:var(--dim);line-height:1.6}',
+    '.pz-patrol-tips strong{color:var(--text-2);font-weight:600}',
+    '.pz-patrol-cap{font-family:var(--font-mono);font-size:10.5px;padding:2px 7px;border-radius:5px;',
+    '  background:#0c1016;border:1px solid var(--line);border-bottom-width:2px;color:var(--text-2)}',
 
-    '.pz-patrol-tick{display:flex;align-items:baseline;gap:10px;font-family:var(--font-mono);font-size:12px;color:var(--dim)}',
-    '.pz-patrol-tick b{font-size:20px;color:var(--acc-2)}',
-    '.pz-patrol-tick i{font-style:normal;color:var(--dimmer)}',
-
-    '.pz-patrol-list{display:flex;flex-direction:column;gap:6px}',
-    '.pz-patrol-row{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;',
-    '  border:1px solid var(--line-soft);background:var(--panel-2);color:var(--text-2);',
-    '  font-size:12px;text-align:left;width:100%}',
-    '.pz-patrol-row:hover{border-color:var(--acc)}',
-    '.pz-patrol-row.is-on{border-color:var(--acc);background:var(--acc-wash)}',
-    '.pz-patrol-row__i{font-size:17px;line-height:1}',
-    '.pz-patrol-row__d{font-family:var(--font-mono);font-size:10px;color:var(--dim)}',
-    '.pz-patrol-row__d b{color:var(--acc-2);font-weight:700}',
-
-    '.pz-patrol-pad{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px);',
-    '  gap:6px;justify-content:center}',
-    '.pz-patrol-pad button{border-radius:9px;border:1px solid var(--line);font-size:14px;',
-    '  background:linear-gradient(180deg,var(--panel-3),var(--panel-2));color:var(--text)}',
-    '.pz-patrol-pad button:hover:not(:disabled){border-color:var(--acc)}',
-    '.pz-patrol-pad button:disabled{opacity:.22}',
-    '.pz-patrol-pad .pz-patrol-wait{font-size:11px;color:var(--acc-2)}',
-
-    '.pz-patrol-read{display:flex;flex-direction:column;gap:6px}',
-    '.pz-patrol-read__row{display:flex;justify-content:space-between;gap:10px;',
-    '  font-family:var(--font-mono);font-size:11px;color:var(--dim)}',
-    '.pz-patrol-read__row b{color:var(--acc-2);font-weight:700}',
-    '.pz-patrol-read__row.is-bad b{color:var(--bad)}',
-
-    '.pz-patrol-key{display:flex;flex-wrap:wrap;gap:9px;font-size:11px;color:var(--dim)}',
+    '.pz-patrol-key{display:flex;flex-wrap:wrap;gap:11px;font-size:11px;color:var(--dim)}',
     '.pz-patrol-key span{display:inline-flex;gap:5px;align-items:center}',
-    '.pz-patrol-key i{width:11px;height:11px;border-radius:3px;display:inline-block;font-style:normal}',
-    '.pz-patrol-key .pz-patrol-sw-now{background:rgba(226,105,95,.55)}',
-    '.pz-patrol-key .pz-patrol-sw-next{background:repeating-linear-gradient(45deg,transparent 0 2px,rgba(230,180,85,.75) 2px 4px)}'
+    '.pz-patrol-key b{color:var(--acc-2);font-weight:600;font-family:var(--font-mono)}',
+
+    '.pz-patrol-arrive{font-size:13px;line-height:1.65;color:var(--text-2);margin-bottom:12px}',
+    '.pz-patrol-arrive b{color:var(--acc-2)}',
+    '.pz-patrol-arrive em{font-style:normal;color:var(--bad)}'
   ].join('\n');
+
+  /* ============================================================ REAL TIME = */
+  /* The generator proves a route through (place, time) exists. Down in the
+     yard that same route has to be WALKABLE, so every number below is set
+     against one fact: the player tops out at 5 tiles a second and the fastest
+     thing watching them does 2.6. A three-to-one speed advantage is what turns
+     a proof into something you can actually do with your hands. */
+
+  var WALK_SPEED = 1.55;      // tiles/s — a bored man pacing a corridor
+  var WALK_WAIT  = 0.5;       // beat at each end of the beat, so you can read it
+  var BEAM_SPEED = 2.6;       // tiles/s — a lamp running the length of a lane
+  var BEAM_WAIT  = 0.2;
+  var TICK_BEAT  = 1.1;       // seconds of yard time per tick of the old clock
+  var SPOT_COOL  = 1.15;      // seconds between sightings, however many eyes
+
+  function angleDelta(a, b) {
+    var d = (b - a) % (Math.PI * 2);
+    if (d > Math.PI) d -= Math.PI * 2;
+    if (d < -Math.PI) d += Math.PI * 2;
+    return d;
+  }
+
+  /** Cone reach, thinned as the yard fills up. Seven overlapping cones on an
+      eight-wide board is a wall, not a watch. */
+  function coneRange(count) {
+    var r = 3.6 - count * 0.12;
+    return r < 2.4 ? 2.4 : (r > 3.6 ? 3.6 : r);
+  }
+
+  /**
+   * A walker's stored route is a corridor walked out and back, so every cell
+   * between the ends is redundant here — the arena lerps along the legs itself.
+   * Two waypoints give the same motion AND let `wait` read as a turn at the end
+   * of the beat instead of a stutter on every single tile.
+   */
+  function walkerRoute(p) {
+    var a = p.route[0], b = p.route[p.len / 2] || p.route[p.route.length - 1];
+    return [[a[0], a[1]], [b[0], b[1]]];
+  }
+
+  /**
+   * A beam lit a whole column at a time on the board. In the yard it is a lamp
+   * that runs the length of that column with a long narrow cone, then shifts
+   * one lane over and runs back — a serpentine that lights the same ground in
+   * the same order, and that you can duck out of because the arena checks line
+   * of sight against the walls.
+   */
+  function beamRoute(p, n) {
+    var route = [], i, c, down;
+    for (i = 0; i < p.line.length; i++) {
+      c = p.line[i];
+      down = (i % 2 === 0);
+      if (p.vertical) {
+        route.push([c, down ? 0 : n - 1]);
+        route.push([c, down ? n - 1 : 0]);
+      } else {
+        route.push([down ? 0 : n - 1, c]);
+        route.push([down ? n - 1 : 0, c]);
+      }
+    }
+    return route;
+  }
 
   /* =============================================================== MOUNT == */
 
@@ -516,254 +539,19 @@
     var C = puzzle.content;
     var n = puzzle.n;
     var finished = false;
-    var showRoute = -1;             // index of the patrol whose beat is drawn
+    var arena = null;
+    var exitStation = null;
+    var eyes = [];              // raw patrol objects, read for the exposure meter
+    var clock = 0, beat = 0, hudT = 0;
+    var lastSpot = -99;
+    var movedThisBeat = false;
+    var arriveLine = null;
 
-    var cells = [];
-    var board = h('div', {
-      class: 'pz-patrol-board',
-      style: { gridTemplateColumns: 'repeat(' + n + ',1fr)', gridTemplateRows: 'repeat(' + n + ',1fr)' }
-    });
-
-    for (var y = 0; y < n; y++) {
-      for (var x = 0; x < n; x++) {
-        (function (cx, cy) {
-          var c = h('button', { type: 'button', class: 'pz-patrol-cell', title: label(cx, cy) });
-          c.addEventListener('click', function () { tryStep(cx, cy); });
-          cells[idx(cx, cy, n)] = c;
-          board.appendChild(c);
-        })(x, y);
-      }
-    }
-
-    var tickBox = h('div', { class: 'pz-patrol-tick' });
-    var listBox = h('div', { class: 'pz-patrol-list' });
-    var readBox = h('div', { class: 'pz-patrol-read' });
-    var controls = h('div', { class: 'pz-col' });
-    var padBtns = {};
-
-    /* ------------------------------------------------------------- render -- */
-
-    function routeCells() {
-      var mark = {};
-      if (showRoute < 0 || !puzzle.patrols[showRoute]) return mark;
-      var p = puzzle.patrols[showRoute];
-      if (p.kind === 'walk') {
-        for (var i = 0; i < p.route.length; i++) mark[idx(p.route[i][0], p.route[i][1], n)] = true;
-      } else {
-        for (var j = 0; j < p.line.length; j++) {
-          for (var q = 0; q < n; q++) mark[p.vertical ? idx(p.line[j], q, n) : idx(q, p.line[j], n)] = true;
-        }
-      }
-      return mark;
-    }
-
-    function glyph(x, y) {
-      if (puzzle.x === x && puzzle.y === y) return C.playerIcon;
-      if (x === puzzle.exit[0] && y === puzzle.exit[1]) return C.exitIcon;
-      if (puzzle.walls[idx(x, y, n)]) return C.wallIcon;
-      for (var i = 0; i < puzzle.patrols.length; i++) {
-        var p = puzzle.patrols[i];
-        if (p.kind !== 'walk') continue;
-        var at = patrolAt(p, puzzle.tick);
-        if (at[0] === x && at[1] === y) return p.icon;
-      }
-      return '';
-    }
-
-    function paint() {
-      var trail = routeCells();
-      var now = puzzle.watched[puzzle.tick % puzzle.period];
-      var next = puzzle.watched[(puzzle.tick + 1) % puzzle.period];
-
-      for (var yy = 0; yy < n; yy++) {
-        for (var xx = 0; xx < n; xx++) {
-          var k = idx(xx, yy, n);
-          var c = cells[k];
-          var cls = 'pz-patrol-cell';
-          var wall = puzzle.walls[k];
-
-          if (wall) cls += ' is-wall';
-          if (trail[k] && !wall) cls += ' is-route';
-          if (now[k] && !wall) cls += ' is-watch';
-          if (next[k] && !wall) cls += ' is-soon';
-          if (xx === puzzle.exit[0] && yy === puzzle.exit[1]) cls += ' is-exit';
-
-          var d = Math.abs(xx - puzzle.x) + Math.abs(yy - puzzle.y);
-          var steppable = !finished && !puzzle.arrived && !wall && d === 1;
-          if (steppable) cls += next[k] ? ' is-step is-risk' : ' is-step is-safe';
-
-          if (xx === puzzle.x && yy === puzzle.y) cls += ' is-me';
-
-          c.className = cls;
-          c.textContent = glyph(xx, yy);
-          c.disabled = finished || (!steppable && !(xx === puzzle.x && yy === puzzle.y));
-        }
-      }
-      paintSide();
-    }
-
-    function paintSide() {
-      var next = puzzle.watched[(puzzle.tick + 1) % puzzle.period];
-
-      PS.ui.clear(tickBox);
-      PS.ui.append(tickBox, [
-        h('span', { text: 'TICK' }),
-        h('b', { text: String(puzzle.tick) }),
-        h('i', { text: 'cycle repeats every ' + puzzle.period })
-      ]);
-
-      PS.ui.clear(listBox);
-      if (!puzzle.patrols.length) {
-        listBox.appendChild(h('div', { class: 'pz-note', text: 'Nothing is watching this ground. Walk it.' }));
-      }
-      for (var i = 0; i < puzzle.patrols.length; i++) {
-        (function (pi) {
-          var p = puzzle.patrols[pi];
-          var here = patrolAt(p, puzzle.tick);
-          var soon = patrolAt(p, puzzle.tick + 1);
-          var where, going;
-          if (p.kind === 'walk') {
-            where = label(here[0], here[1]);
-            going = label(soon[0], soon[1]);
-          } else {
-            where = (p.vertical ? 'col ' + String.fromCharCode(65 + here) : 'row ' + (here + 1));
-            going = (p.vertical ? String.fromCharCode(65 + soon) : String(soon + 1));
-          }
-          var btn = h('button', {
-            type: 'button',
-            class: 'pz-patrol-row' + (showRoute === pi ? ' is-on' : ''),
-            title: 'Show this beat on the board'
-          }, [
-            h('span', { class: 'pz-patrol-row__i', text: p.icon }),
-            h('span', {}, [
-              h('div', { text: p.name }),
-              h('div', { class: 'pz-patrol-row__d' }, [
-                'loop ' + p.len + ' \u00B7 at ' + where + ' \u00B7 next ',
-                h('b', { text: going })
-              ])
-            ])
-          ]);
-          btn.addEventListener('click', function () {
-            showRoute = (showRoute === pi) ? -1 : pi;
-            paint();
-          });
-          listBox.appendChild(btn);
-        })(i);
-      }
-
-      PS.ui.clear(readBox);
-      PS.ui.append(readBox, [
-        row('Standing at', label(puzzle.x, puzzle.y), ''),
-        row('Steps taken', String(puzzle.moves) + (puzzle.waits ? ' (' + puzzle.waits + ' held)' : ''), ''),
-        row('Shortest clean line', puzzle.bestLen + ' ticks', ''),
-        row('Times seen', String(puzzle.strikes), puzzle.strikes ? 'is-bad' : '')
-      ]);
-
-      if (!finished && !puzzle.arrived) {
-        var dirs = [['up', 0, -1], ['down', 0, 1], ['left', -1, 0], ['right', 1, 0]];
-        for (var d = 0; d < dirs.length; d++) {
-          var nx = puzzle.x + dirs[d][1], ny = puzzle.y + dirs[d][2];
-          var okc = nx >= 0 && ny >= 0 && nx < n && ny < n && !puzzle.walls[idx(nx, ny, n)];
-          padBtns[dirs[d][0]].disabled = !okc;
-        }
-        padBtns.wait.disabled = false;
-        padBtns.wait.textContent = next[idx(puzzle.x, puzzle.y, n)] ? 'HOLD \u26A0' : 'HOLD';
-      }
-
-      function row(k, v, cls) {
-        return h('div', { class: 'pz-patrol-read__row ' + (cls || '') },
-          [h('span', { text: k }), h('b', { text: v })]);
-      }
-    }
-
-    /* -------------------------------------------------------------- moving */
-
-    function tryStep(x, y) {
-      if (finished || puzzle.arrived) return;
-      if (x < 0 || y < 0 || x >= n || y >= n) return;
-      var d = Math.abs(x - puzzle.x) + Math.abs(y - puzzle.y);
-      if (d === 0) { advance(puzzle.x, puzzle.y, true); return; }
-      if (d !== 1) return;
-      if (puzzle.walls[idx(x, y, n)]) { api.toast('Blocked.', 'bad', 900); return; }
-      advance(x, y, false);
-    }
-
-    /** One action = one tick. The world moves whether you do or not. */
-    function advance(x, y, held) {
-      puzzle.x = x;
-      puzzle.y = y;
-      puzzle.tick++;
-      if (held) puzzle.waits++; else puzzle.moves++;
-
-      api.tweak({ energy: held ? -1 : -2 });
-
-      if (isWatched(puzzle, x, y, puzzle.tick)) {
-        puzzle.strikes++;
-        api.tweak({ health: -(3 + puzzle.tier), morale: -4 });
-        api.toast(C.spotted, 'bad', 2400);
-        var c = cells[idx(x, y, n)];
-        c.classList.remove('is-hit');
-        void c.offsetWidth;
-        c.classList.add('is-hit');
-      }
-
-      if (x === puzzle.exit[0] && y === puzzle.exit[1]) {
-        puzzle.arrived = true;
-        paint();
-        renderChoice();
-        api.flash();
-        return;
-      }
-      paint();
-    }
-
-    function onKey(ev) {
-      if (finished || puzzle.arrived) return;
-      var map = {
-        ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
-        w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
-        W: [0, -1], S: [0, 1], A: [-1, 0], D: [1, 0]
-      };
-      if (ev.key === ' ' || ev.key === '.') { ev.preventDefault(); advance(puzzle.x, puzzle.y, true); return; }
-      var m = map[ev.key];
-      if (!m) return;
-      ev.preventDefault();
-      tryStep(puzzle.x + m[0], puzzle.y + m[1]);
-    }
-    document.addEventListener('keydown', onKey);
-    teardownFns.push(function () { document.removeEventListener('keydown', onKey); });
-
-    function pad() {
-      function b(key, lbl, dx, dy, cls) {
-        var btn = h('button', { type: 'button', text: lbl, class: cls || null });
-        btn.addEventListener('click', function () { tryStep(puzzle.x + dx, puzzle.y + dy); });
-        padBtns[key] = btn;
-        return btn;
-      }
-      var sp = function () { return h('div', {}); };
-      return h('div', { class: 'pz-patrol-pad' }, [
-        sp(), b('up', '\u25B2', 0, -1), sp(),
-        b('left', '\u25C0', -1, 0), b('wait', 'HOLD', 0, 0, 'pz-patrol-wait'), b('right', '\u25B6', 1, 0),
-        sp(), b('down', '\u25BC', 0, 1), sp()
-      ]);
-    }
+    var stage = h('div', {});
+    var wrap = h('div', { class: 'pz-patrol' }, [stage]);
+    PS.ui.append(el, wrap);
 
     /* ------------------------------------------------------------ endings -- */
-
-    function renderChoice() {
-      PS.ui.clear(controls);
-      PS.ui.append(controls, [
-        h('div', { class: 'pz-intro' }, [
-          C.arrive + ' ',
-          h('em', {
-            text: puzzle.strikes === 0
-              ? 'Nobody saw you once.'
-              : 'They saw you ' + puzzle.strikes + ' time' + (puzzle.strikes === 1 ? '' : 's') + '.'
-          })
-        ]),
-        h('div', { class: 'pz-choices' }, [choiceBtn(C.a), choiceBtn(C.b)])
-      ]);
-    }
 
     function choiceBtn(spec) {
       return h('button', {
@@ -830,35 +618,231 @@
       });
     }
 
-    /* ------------------------------------------------------------- layout -- */
+    function endChoices() {
+      return h('div', { class: 'pz-choices' }, [choiceBtn(C.a), choiceBtn(C.b)]);
+    }
 
-    PS.ui.append(controls, [
-      pad(),
-      h('div', { class: 'pz-patrol-key' }, [
-        h('span', {}, [h('i', { class: 'pz-patrol-sw-now' }), ' watched now']),
-        h('span', {}, [h('i', { class: 'pz-patrol-sw-next' }), ' watched next tick']),
-        h('span', {}, [C.exitIcon, ' ' + C.exitName])
-      ]),
-      h('button', { class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button', onclick: bolt },
-        ['\uD83C\uDFC3 Break cover and run'])
+    /* ------------------------------------------------------- degraded mode -- */
+    /* arena.js is core and always present, but never let a missing layer strand
+       the player in a scene they cannot leave.                                */
+
+    if (!PS.arena || typeof PS.arena.create !== 'function') {
+      PS.ui.append(stage, [
+        h('div', { class: 'pz-intro', text: C.arrive }),
+        endChoices()
+      ]);
+      return;
+    }
+
+    /* --------------------------------------------------------------- yard -- */
+
+    var tiles = [], ty, tx, row;
+    for (ty = 0; ty < n; ty++) {
+      row = [];
+      for (tx = 0; tx < n; tx++) row.push(puzzle.walls[idx(tx, ty, n)] ? 1 : 0);
+      tiles.push(row);
+    }
+
+    arena = PS.arena.create(stage, {
+      map: { w: n, h: n, tiles: tiles },
+      spawn: { x: puzzle.start[0], y: puzzle.start[1] },
+      avatar: C.playerIcon,
+      light: state.stats.light,
+      // Nothing here is hidden — that was always the deal. The yard stays
+      // legible end to end; your own light only decides how sharp the ground
+      // immediately under you looks.
+      lightCurve: function (v) { return 2.2 + Math.max(0, Math.min(100, v)) / 100 * 2.6; },
+      darkness: 0.7,
+      memory: 0.88,
+      onStep: onStep,
+      onTick: onTick,
+      onDetect: onDetect
+    });
+    if (!arena) {
+      PS.ui.append(stage, [h('div', { class: 'pz-intro', text: C.arrive }), endChoices()]);
+      return;
+    }
+    teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
+    arena.revealAll();
+
+    /* ------------------------------------------------------------ the watch */
+
+    function phase(handle, p) {
+      // The generator gave every patrol a starting offset in its own cycle and
+      // that offset is half of what makes a yard readable. Put it back.
+      var raw = handle && handle.raw;
+      if (!raw || !raw.route || raw.route.length < 2 || !p.len) return;
+      var legs = raw.route.length;
+      var pos = ((p.offset % p.len) / p.len) * legs;
+      var leg = Math.floor(pos) % legs;
+      raw.leg = leg;
+      raw.t = Math.min(0.999, pos - Math.floor(pos));
+      var a = raw.route[leg], b = raw.route[(leg + 1) % legs];
+      raw.x = a[0] + (b[0] - a[0]) * raw.t;
+      raw.y = a[1] + (b[1] - a[1]) * raw.t;
+      raw.dir = Math.atan2(b[1] - a[1], b[0] - a[0]);
+      eyes.push(raw);
+    }
+
+    var reach = coneRange(puzzle.patrols.length);
+    for (var pi = 0; pi < puzzle.patrols.length; pi++) {
+      (function (p) {
+        var walker = p.kind === 'walk';
+        phase(arena.patrol({
+          route: walker ? walkerRoute(p) : beamRoute(p, n),
+          speed: walker ? WALK_SPEED : BEAM_SPEED,
+          wait: walker ? WALK_WAIT : BEAM_WAIT,
+          icon: p.icon,
+          label: p.name,
+          vision: walker
+            ? { range: reach, fov: 1.15 }
+            : { range: n, fov: 0.42 }
+          // detection is handled once, at the arena level, so a yard full of
+          // overlapping cones still only bills you for one sighting.
+        }), p);
+      })(puzzle.patrols[pi]);
+    }
+
+    /* ------------------------------------------------------- the way out --- */
+
+    exitStation = arena.station({
+      x: puzzle.exit[0], y: puzzle.exit[1],
+      icon: C.exitIcon, label: C.exitName, hint: 'walk in, or press E',
+      radius: 1.2, emits: 1.9,
+      onEnter: function (panel) {
+        arriveLine = h('div', { class: 'pz-patrol-arrive' });
+        paintArrive();
+        PS.ui.append(panel, [arriveLine, endChoices()]);
+      },
+      onOpen: function () {
+        paintArrive();
+        if (puzzle.arrived || finished) return;
+        puzzle.arrived = true;
+        api.flash();
+        arena.ping(puzzle.exit[0], puzzle.exit[1]);
+      }
+    });
+
+    function paintArrive() {
+      if (!arriveLine) return;
+      PS.ui.clear(arriveLine);
+      PS.ui.append(arriveLine, [
+        C.arrive + ' ',
+        h('em', {
+          text: puzzle.strikes === 0
+            ? 'Nobody saw you once.'
+            : 'They saw you ' + puzzle.strikes + ' time' + (puzzle.strikes === 1 ? '' : 's') + '.'
+        })
+      ]);
+    }
+
+    /* ---------------------------------------------------------------- HUD -- */
+
+    var cWhere = arena.chip('At', '\uD83D\uDCCD');
+    var cSteps = arena.chip('Steps', '\uD83D\uDC63');
+    var cSeen  = arena.chip('Spotted', '\uD83D\uDC41\uFE0F');
+    var mExpo  = arena.meter('Exposure', '\uD83D\uDD26');
+
+    arena.note('Every cone is drawn and every loop repeats. Stand still and read them before you cross.');
+    arena.button('\uD83C\uDFC3 Break cover and run', bolt, 'pz-btn--danger');
+
+    PS.ui.append(wrap, [
+      h('div', { class: 'pz-patrol-tips' }, [
+        h('span', {}, [
+          h('b', { class: 'pz-patrol-cap', text: 'W A S D' }), ' / ',
+          h('b', { class: 'pz-patrol-cap', text: '\u2190\u2191\u2193\u2192' }),
+          ' move \u00B7 hold or click the ', h('strong', { text: 'mouse' }), ' to go there'
+        ]),
+        h('div', { class: 'pz-patrol-key' }, [
+          h('span', {}, [C.walkIcon, ' ' + C.walkPlural]),
+          h('span', {}, [C.beamIcon, ' ' + C.beamPlural]),
+          h('span', {}, [C.exitIcon, ' ' + C.exitName]),
+          h('span', {}, ['clean line ', h('b', { text: puzzle.bestLen + ' ticks' })])
+        ])
+      ])
     ]);
 
-    PS.ui.append(el, h('div', { class: 'pz-patrol' }, [
-      h('div', { class: 'pz-col' }, [
-        board,
-        h('div', { class: 'pz-note' }, [
-          'Every action costs one tick, including ', h('strong', { text: 'holding still' }),
-          ' \u2014 so the hatched cells are where you must not be standing when you next stop moving.'
-        ])
-      ]),
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'The clock' }), tickBox, readBox]),
-        h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'Who is looking' }), listBox]),
-        h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'Move' }), controls])
-      ])
-    ]));
+    /* ------------------------------------------------------------- living -- */
 
-    paint();
+    function onStep(x, y) {
+      if (finished) return;
+      puzzle.x = x;
+      puzzle.y = y;
+      puzzle.moves++;
+      movedThisBeat = true;
+      // Half a point of energy a tile, charged on the even ones. Free movement
+      // means more ground covered than the old five-actions-a-tick board did.
+      if (puzzle.moves % 2 === 0) api.tweak({ energy: -1 });
+      paintHud();
+    }
+
+    function onTick(dt) {
+      if (finished) return;
+      clock += dt;
+      beat += dt;
+      hudT += dt;
+      if (beat >= TICK_BEAT) {
+        beat -= TICK_BEAT;
+        puzzle.tick++;
+        if (!movedThisBeat) puzzle.waits++;
+        movedThisBeat = false;
+      }
+      if (hudT >= 0.14) { hudT = 0; paintHud(); }
+    }
+
+    function onDetect() { spotted(); }
+
+    /** Being seen costs blood and composure. It has never ended the run and it
+        does not start now — you can walk across in front of everyone if you are
+        willing to pay for it. */
+    function spotted() {
+      if (finished || !arena) return;
+      if (clock - lastSpot < SPOT_COOL) return;
+      lastSpot = clock;
+      puzzle.strikes++;
+      api.tweak({ health: -(3 + puzzle.tier), morale: -4 });
+      api.toast(C.spotted, 'bad', 2400);
+      var pl = arena.player();
+      arena.hit('#e2695f');
+      arena.shake(9, 0.34);
+      arena.dust(pl.tx, pl.ty, 9, '#e2695f');
+      paintArrive();
+      paintHud();
+    }
+
+    function exposureNow() {
+      if (!arena || !eyes.length) return 0;
+      var pl = arena.player(), best = 0, i;
+      for (i = 0; i < eyes.length; i++) {
+        var e = eyes[i];
+        if (!e || !e.vision) continue;
+        var dx = pl.x - e.x, dy = pl.y - e.y;
+        var d = Math.sqrt(dx * dx + dy * dy);
+        if (d > e.vision.range) continue;
+        var off = Math.abs(angleDelta(e.dir, Math.atan2(dy, dx)));
+        var half = e.vision.fov / 2;
+        var cone = off <= half ? 1 : Math.max(0, 1 - (off - half) / 0.85);
+        if (cone <= 0) continue;
+        var v = cone * (0.34 + (1 - d / e.vision.range) * 0.66);
+        if (v > best) best = v;
+      }
+      return Math.round(best * 100);
+    }
+
+    function paintHud() {
+      if (!arena || finished) return;
+      var pl = arena.player();
+      var ex = exposureNow();
+      var tone = ex >= 75 ? 'bad' : (ex >= 40 ? 'warn' : null);
+
+      cWhere.set(label(pl.tx, pl.ty));
+      cSteps.set(puzzle.moves + ' \u00B7 tick ' + puzzle.tick);
+      cSeen.set(String(puzzle.strikes), puzzle.strikes ? 'bad' : null);
+      mExpo.set(ex, ex >= 75 ? 'in the light' : (ex >= 40 ? 'edge of it' : 'dark'), tone);
+    }
+
+    paintHud();
+    arena.focus();
   }
 
   function unmount() {
