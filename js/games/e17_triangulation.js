@@ -608,6 +608,7 @@
     /* -------------------------------------------------------------- paint -- */
 
     function paint() {
+      disarmQuit();
       var lits = [];
       for (var i = 0; i < puzzle.readings.length; i++) if (puzzle.lit[i] && isKnown(i)) lits.push(i);
 
@@ -1035,7 +1036,6 @@
       if (puzzle.sensorsLeft > 0) {
         arena.button('\uD83D\uDCCD Put the ' + C.sensorName + ' down here', plantHere);
       }
-      arena.button('\u21A9 Leave it unplotted', abandon, 'pz-btn--danger');
       arena.focus();
       return true;
     }
@@ -1050,6 +1050,33 @@
       });
     }
 
+    /* --------------------------------------------------------- walking out */
+    /* Abandoning the fix is irreversible, so it asks once. Anything else you
+       do stands it back down. */
+
+    var quitBtn = h('button', {
+      class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button', 'data-act': 'giveup',
+      text: '\u21A9 Leave it unplotted'
+    });
+    var quitArmed = false;
+
+    quitBtn.addEventListener('click', function () {
+      if (finished || puzzle.done) return;
+      if (!quitArmed) {
+        quitArmed = true;
+        quitBtn.textContent = '\u21A9 Really leave it unplotted?';
+        api.toast('Press it again if you mean it.', 'bad', 2600);
+        return;
+      }
+      abandon();
+    });
+
+    function disarmQuit() {
+      if (!quitArmed) return;
+      quitArmed = false;
+      quitBtn.textContent = '\u21A9 Leave it unplotted';
+    }
+
     /* ------------------------------------------------------------- layout -- */
 
     PS.ui.append(controls, [
@@ -1060,7 +1087,8 @@
           onclick: function () { allRings(false); } }, ['Clear plot'])
       ]),
       h('button', { class: 'pz-btn pz-btn--primary', type: 'button', 'data-act': 'commit', onclick: commit },
-        ['Commit the fix'])
+        ['Commit the fix']),
+      quitBtn
     ]);
 
     var plotCard = h('div', { class: 'pz-tri-plot' }, [grid]);
@@ -1096,9 +1124,7 @@
       arena = null;
       PS.ui.append(controls, [
         h('button', { class: 'pz-btn pz-btn--sm', type: 'button', 'data-act': 'deploy', onclick: armSensor },
-          ['\uD83D\uDCCD Put out a ' + C.sensorName]),
-        h('button', { class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button', 'data-act': 'giveup', onclick: abandon },
-          ['\u21A9 Leave it unplotted'])
+          ['\uD83D\uDCCD Put out a ' + C.sensorName])
       ]);
 
       document.addEventListener('keydown', onKey);
