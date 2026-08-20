@@ -365,60 +365,44 @@
     };
   }
 
+
   /* ================================================================ CSS == */
+  /* The ground itself is the arena's canvas. This dresses the strip of
+     briefing that sits under it. */
 
   var CSS = [
-    '.pz-adj{display:grid;grid-template-columns:minmax(0,1fr) minmax(228px,296px);gap:18px;align-items:start}',
-    '@media (max-width:860px){.pz-adj{grid-template-columns:1fr}}',
+    '.pz-adj{display:flex;flex-direction:column;gap:12px}',
 
-    '.pz-adj-board{display:grid;gap:3px;padding:12px;border-radius:12px;background:#05070a;',
-    '  border:1px solid var(--line);box-shadow:inset 0 0 60px rgba(0,0,0,.85);',
-    '  width:100%;max-width:520px;margin:0 auto}',
-    '.pz-adj-board.is-shake{animation:pzAdjShake .38s var(--ease)}',
+    '.pz-adj-tips{display:flex;flex-wrap:wrap;gap:14px;align-items:center;',
+    '  font-size:12px;color:var(--dim);line-height:1.6}',
+    '.pz-adj-tips strong{color:var(--text-2);font-weight:600}',
+    '.pz-adj-cap{font-family:var(--font-mono);font-size:10.5px;padding:2px 7px;border-radius:5px;',
+    '  background:#0c1016;border:1px solid var(--line);border-bottom-width:2px;color:var(--text-2)}',
 
-    '.pz-adj-cell{position:relative;aspect-ratio:1/1;display:grid;place-items:center;border-radius:5px;',
-    '  font-family:var(--font-mono);font-size:clamp(10px,2.3vw,17px);font-weight:700;line-height:1;',
-    '  background:#131923;border:1px solid #1d2531;color:var(--dimmer);cursor:default;',
-    '  transition:background .2s var(--ease),transform .12s var(--ease),border-color .2s var(--ease)}',
-    '.pz-adj-cell.is-open{background:#0a0e14;border-color:#161c25;color:var(--text-2)}',
-    '.pz-adj-cell.is-open.is-quiet{color:var(--dimmer)}',
-    '.pz-adj-cell.is-step{cursor:pointer;border-color:color-mix(in srgb,var(--acc) 55%,transparent);',
-    '  box-shadow:0 0 0 1px color-mix(in srgb,var(--acc) 18%,transparent) inset}',
-    '.pz-adj-cell.is-step:hover{background:var(--acc-wash);transform:scale(1.07)}',
-    '.pz-adj-cell.is-flag{background:#2a1a18;border-color:#5c2b26}',
-    '.pz-adj-cell.is-blown{background:#3a1a17;border-color:var(--bad);color:#ffd9d5}',
-    '.pz-adj-cell.is-me{background:radial-gradient(circle,var(--acc-wash),transparent 70%);',
-    '  border-color:var(--acc);box-shadow:0 0 20px var(--acc-glow);z-index:2}',
-    '.pz-adj-cell.is-walked::after{content:"";position:absolute;inset:auto 0 3px 0;height:2px;margin:0 26%;',
-    '  border-radius:2px;background:color-mix(in srgb,var(--acc) 50%,transparent)}',
-    '.pz-adj-cell.is-goal{border-bottom:2px solid color-mix(in srgb,var(--good) 60%,transparent)}',
-    '.pz-adj-cell.is-hinted{box-shadow:0 0 0 2px var(--good) inset}',
-
-    '.pz-adj-cell.n1{color:#7ec7f2}.pz-adj-cell.n2{color:#5fcf8d}.pz-adj-cell.n3{color:#e9c45c}',
-    '.pz-adj-cell.n4{color:#e2695f}.pz-adj-cell.n5{color:#e08ad0}.pz-adj-cell.n6{color:#b48ce0}',
-    '.pz-adj-cell.n7,.pz-adj-cell.n8{color:#fff}',
-
-    '.pz-adj-edge{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;',
-    '  letter-spacing:.14em;text-transform:uppercase;color:var(--dimmer);padding:0 4px}',
-
-    '.pz-adj-meter{display:flex;flex-direction:column;gap:6px}',
-    '.pz-adj-meter__row{display:flex;justify-content:space-between;gap:10px;font-family:var(--font-mono);',
-    '  font-size:11px;color:var(--dim)}',
-    '.pz-adj-meter__row b{color:var(--acc-2)}',
-    '.pz-adj-meter__row.is-bad b{color:var(--bad)}',
-
-    '.pz-adj-mode{display:flex;gap:8px;align-items:center;flex-wrap:wrap}',
-    '.pz-adj-mode__on{font-size:11px;color:var(--dim);font-family:var(--font-mono)}',
-
-    '.pz-adj-legend{display:flex;flex-wrap:wrap;gap:9px;font-size:11px;color:var(--dim)}',
+    '.pz-adj-legend{display:flex;flex-wrap:wrap;gap:11px;font-size:11px;color:var(--dim)}',
     '.pz-adj-legend span{display:inline-flex;gap:5px;align-items:center}',
+    '.pz-adj-legend b{color:var(--acc-2);font-weight:600;font-family:var(--font-mono)}',
 
-    '.pz-adj-warn{font-size:12px;line-height:1.55;color:var(--bad);padding:9px 11px;border-radius:8px;',
-    '  background:rgba(226,105,95,.08);border:1px solid rgba(226,105,95,.28)}',
-
-    '@keyframes pzAdjShake{0%,100%{transform:translate(0,0)}20%{transform:translate(-7px,2px)}',
-    '  45%{transform:translate(6px,-2px)}70%{transform:translate(-4px,1px)}}'
+    '.pz-adj-arrive{font-size:13px;line-height:1.65;color:var(--text-2);margin-bottom:12px}',
+    '.pz-adj-arrive b{color:var(--acc-2)}'
   ].join('\n');
+
+  /* ============================================================ THE FLOOR = */
+  /* Every glyph the arena draws goes through fillText with whatever fill was
+     last set, so a plain ASCII digit comes out in translucent black and
+     vanishes. Keycap emoji carry their own colour. Numbers on this floor are
+     the entire puzzle, so they are keycaps. */
+
+  var KEYCAP = ['0\uFE0F\u20E3', '1\uFE0F\u20E3', '2\uFE0F\u20E3', '3\uFE0F\u20E3', '4\uFE0F\u20E3',
+    '5\uFE0F\u20E3', '6\uFE0F\u20E3', '7\uFE0F\u20E3', '8\uFE0F\u20E3'];
+
+  /* The grid sits inside a framed field: one wall row at the top and bottom,
+     one wall column each side, and a walkable bank on either end of the
+     crossing. Grid cell (gx, gy) is arena tile (gx + 1, gy + 2). */
+  var PAD_X = 1;
+  var PAD_Y = 2;
+
+  function keycap(n) { return KEYCAP[n] || KEYCAP[8]; }
 
   /* ================================================================ MOUNT = */
 
@@ -428,203 +412,23 @@
     var h = PS.ui.h;
     var C = puzzle.content;
     var w = puzzle.w, gh = puzzle.h;
-    var cells = [];
     var finished = false;
-    var markMode = false;
-    var hinted = -1;
+    var arena = null;
+    var marks = {};             // grid idx -> flag prop handle
+    var lastHint = -1;
+    var hudT = 0;
 
-    var board = h('div', {
-      class: 'pz-adj-board',
-      style: { gridTemplateColumns: 'repeat(' + w + ', 1fr)' }
-    });
+    var stage = h('div', {});
+    var wrap = h('div', { class: 'pz-adj' }, [stage]);
+    PS.ui.append(el, wrap);
 
-    var meter = h('div', { class: 'pz-adj-meter' });
-    var warnBox = h('div', {});
-    var actionBox = h('div', { class: 'pz-col' });
-    var modeBtn = h('button', { class: 'pz-btn pz-btn--sm', type: 'button' }, ['\uD83D\uDEA9 Mark: off']);
+    var bankY = gh + PAD_Y;                 // the far bank, one row past the grid
+    var exitX = Math.floor(w / 2) + PAD_X;
 
-    for (var i = 0; i < w * gh; i++) {
-      (function (idx) {
-        var c = h('div', { class: 'pz-adj-cell' });
-        c.addEventListener('click', function (ev) {
-          if (markMode || ev.shiftKey || ev.altKey) toggleFlag(idx);
-          else tryStep(idx);
-        });
-        c.addEventListener('contextmenu', function (ev) { ev.preventDefault(); toggleFlag(idx); });
-        cells.push(c);
-        board.appendChild(c);
-      })(i);
-    }
-
-    /* ------------------------------------------------------------- render -- */
-
-    function adjacentToMe(idx) {
-      var nb = puzzle.n4[puzzle.at];
-      for (var j = 0; j < nb.length; j++) if (nb[j] === idx) return true;
-      return false;
-    }
-
-    function paint() {
-      for (var idx = 0; idx < cells.length; idx++) {
-        var c = cells[idx];
-        var cls = 'pz-adj-cell';
-        var txt = '';
-
-        var open = puzzle.revealed[idx] !== undefined;
-        if (puzzle.triggered[idx]) {
-          cls += ' is-blown';
-          txt = C.hazardIcon;
-        } else if (open) {
-          cls += ' is-open is-walked';
-          var n = puzzle.revealed[idx];
-          if (n > 0) { cls += ' n' + n; txt = String(n); }
-          else { cls += ' is-quiet'; txt = C.safeIcon; }
-        } else if (puzzle.flags[idx]) {
-          cls += ' is-flag';
-          txt = C.flagIcon;
-        }
-
-        if (Math.floor(idx / w) === gh - 1) cls += ' is-goal';
-        if (idx === puzzle.at) { cls += ' is-me'; txt = C.playerIcon; }
-        else if (!finished && !puzzle.done && adjacentToMe(idx) && !puzzle.triggered[idx]) cls += ' is-step';
-        if (idx === hinted && !open) cls += ' is-hinted';
-
-        c.className = cls;
-        c.textContent = txt;
-      }
-      paintMeter();
-    }
-
-    function paintMeter() {
-      PS.ui.clear(meter);
-      var row = Math.floor(puzzle.at / w);
-      PS.ui.append(meter, [
-        line('Rows crossed', row + ' of ' + (gh - 1)),
-        line('Steps taken', String(puzzle.steps)),
-        line('Shortest crossing', puzzle.minPath + ' steps'),
-        line('Cells read', String(countKeys(puzzle.revealed))),
-        line('Marked', String(countKeys(puzzle.flags))),
-        line('Went through', String(puzzle.hits), puzzle.hits > 0)
-      ]);
-
-      PS.ui.clear(warnBox);
-      if (!puzzle.done && puzzle.hits > 0) {
-        warnBox.appendChild(h('div', { class: 'pz-adj-warn' },
-          ['You have been through the ' + C.gridWord + ' ' + puzzle.hits + ' time' + (puzzle.hits === 1 ? '' : 's') +
-            '. Every number on this board is free information. Use it before you commit weight.']));
-      }
-
-      function line(k, v, bad) {
-        return h('div', { class: 'pz-adj-meter__row' + (bad ? ' is-bad' : '') },
-          [h('span', { text: k }), h('b', { text: v })]);
-      }
-    }
-
-    function countKeys(o) {
-      var n = 0;
-      for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) n++;
-      return n;
-    }
-
-    /* ------------------------------------------------------------- moving -- */
-
-    function toggleFlag(idx) {
-      if (finished || puzzle.done) return;
-      if (puzzle.revealed[idx] !== undefined || puzzle.triggered[idx]) return;
-      if (puzzle.flags[idx]) delete puzzle.flags[idx];
-      else puzzle.flags[idx] = true;
-      hinted = -1;
-      paint();
-    }
-
-    function tryStep(idx) {
-      if (finished || puzzle.done) return;
-      if (!adjacentToMe(idx)) return;
-      if (puzzle.triggered[idx]) { api.toast('There is a hole there now.', 'bad', 1200); return; }
-      if (puzzle.flags[idx]) {
-        api.toast('You marked that one yourself. Unmark it first if you have changed your mind.', 'info', 2400);
-        return;
-      }
-      hinted = -1;
-      puzzle.hintCell = undefined;
-
-      if (puzzle.hazard[idx]) {
-        // Never fatal — expensive. You go through, and you climb back out.
-        puzzle.triggered[idx] = true;
-        puzzle.hits++;
-        puzzle.flags[idx] = false;
-        delete puzzle.flags[idx];
-        api.tweak({ health: -puzzle.damage, energy: -4, morale: -6 });
-        api.toast(C.hit[puzzle.hits % C.hit.length], 'bad', 3000);
-        board.classList.remove('is-shake');
-        void board.offsetWidth;
-        board.classList.add('is-shake');
-        paint();
-        return;
-      }
-
-      puzzle.at = idx;
-      puzzle.steps++;
-      if (puzzle.revealed[idx] === undefined) {
-        puzzle.revealed[idx] = puzzle.counts[idx];
-        api.tweak({ energy: -1 });
-      }
-
-      if (Math.floor(idx / w) === gh - 1) {
-        puzzle.done = true;
-        paint();
-        renderEnd();
-        return;
-      }
-      paint();
-    }
-
-    function onKey(ev) {
-      if (finished || puzzle.done) return;
-      var map = {
-        ArrowUp: -w, ArrowDown: w, ArrowLeft: -1, ArrowRight: 1,
-        w: -w, s: w, a: -1, d: 1, W: -w, S: w, A: -1, D: 1
-      };
-      if (ev.key === 'f' || ev.key === 'F') {
-        ev.preventDefault();
-        setMark(!markMode);
-        return;
-      }
-      var delta = map[ev.key];
-      if (delta === undefined) return;
-      ev.preventDefault();
-      var to = puzzle.at + delta;
-      // Guard the wrap: moving left off column 0 must not land on the row above.
-      if ((delta === -1 && puzzle.at % w === 0) || (delta === 1 && puzzle.at % w === w - 1)) return;
-      if (to < 0 || to >= w * gh) return;
-      if (markMode) toggleFlag(to); else tryStep(to);
-    }
-
-    function setMark(on) {
-      markMode = on;
-      modeBtn.textContent = '\uD83D\uDEA9 Mark: ' + (on ? 'on' : 'off');
-      modeBtn.className = 'pz-btn pz-btn--sm' + (on ? ' pz-btn--primary' : '');
-    }
-
-    document.addEventListener('keydown', onKey);
-    teardownFns.push(function () { document.removeEventListener('keydown', onKey); });
-    modeBtn.addEventListener('click', function () { setMark(!markMode); });
+    function ax(gx) { return gx + PAD_X; }
+    function ay(gy) { return gy + PAD_Y; }
 
     /* ------------------------------------------------------------ endings -- */
-
-    function renderEnd() {
-      PS.ui.clear(actionBox);
-      var clean = puzzle.hits === 0;
-      PS.ui.append(actionBox, [
-        h('div', { class: 'pz-intro', text: (clean ? C.clear : C.messy) + ' ' +
-          puzzle.steps + ' steps across; the shortest line was ' + puzzle.minPath + '.' }),
-        h('div', { class: 'pz-choices' }, [
-          choiceBtn(C.onward, 'sprint'),
-          choiceBtn(C.careful, 'scavenge')
-        ])
-      ]);
-      api.flash();
-    }
 
     function choiceBtn(spec, id) {
       return h('button', {
@@ -634,6 +438,13 @@
         h('div', { class: 'pz-choice__i', text: spec.icon }),
         h('div', { class: 'pz-choice__t', text: spec.title }),
         h('div', { class: 'pz-choice__d', text: spec.desc })
+      ]);
+    }
+
+    function endChoices() {
+      return h('div', { class: 'pz-choices' }, [
+        choiceBtn(C.onward, 'sprint'),
+        choiceBtn(C.careful, 'scavenge')
       ]);
     }
 
@@ -687,65 +498,280 @@
       });
     }
 
-    /* -------------------------------------------------------- hint marker -- */
-    /* core's api.hint() calls engine.hint() and THEN charges morale, which
-       emits a state change. So by the time this listener runs, hint() has
-       already recorded which cell it was talking about, and we can light it
-       up on the board instead of making the player parse compass directions. */
-    var offState = state.on(function () {
-      if (finished) return;
-      if (puzzle.hintCell !== undefined && puzzle.hintCell !== hinted) hinted = puzzle.hintCell;
-      paint();
+    function countKeys(o) {
+      var n = 0;
+      for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) n++;
+      return n;
+    }
+
+    /* ------------------------------------------------------- degraded mode -- */
+
+    if (!PS.arena || typeof PS.arena.create !== 'function') {
+      PS.ui.append(stage, [
+        h('div', { class: 'pz-intro', text: C.clear }),
+        endChoices()
+      ]);
+      return;
+    }
+
+    /* --------------------------------------------------------- the ground -- */
+    /* Nothing here is a wall except the frame. The danger is under the floor,
+       which is exactly why walking is the act of committing to a deduction. */
+
+    var MW = w + PAD_X * 2, MH = gh + PAD_Y + 2;
+    var tiles = [], y, x, row;
+    for (y = 0; y < MH; y++) {
+      row = [];
+      for (x = 0; x < MW; x++) {
+        row.push((y === 0 || y === MH - 1 || x === 0 || x === MW - 1) ? 1 : 0);
+      }
+      tiles.push(row);
+    }
+
+    arena = PS.arena.create(stage, {
+      map: { w: MW, h: MH, tiles: tiles },
+      spawn: { x: ax(puzzle.start % w), y: ay(Math.floor(puzzle.start / w)) },
+      avatar: C.playerIcon,
+      light: state.stats.light,
+      lightCurve: function (v) { return 2.4 + Math.max(0, Math.min(100, v)) / 100 * 2.4; },
+      // Numbers you have already paid for must stay readable from anywhere;
+      // a crossing you cannot re-read is a memory test, not a deduction.
+      darkness: 0.62,
+      memory: 0.92,
+      onStep: onStep,
+      onTick: onTick
     });
-    teardownFns.push(function () { if (offState) offState(); });
+    if (!arena) {
+      PS.ui.append(stage, [h('div', { class: 'pz-intro', text: C.clear }), endChoices()]);
+      return;
+    }
+    teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
+    arena.revealAll();
 
-    /* ------------------------------------------------------------- layout -- */
+    /* --------------------------------------------------------- the far side */
 
-    PS.ui.append(actionBox, [
-      h('div', { class: 'pz-adj-mode' }, [
-        modeBtn,
-        h('span', { class: 'pz-adj-mode__on', text: 'right-click or shift-click also marks' })
-      ]),
-      h('button', {
-        class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button', onclick: turnBack
-      }, ['\u21A9 Go back to ' + C.nearSide])
-    ]);
+    var arriveLine = null;
+    var exitStation = arena.station({
+      x: exitX, y: bankY,
+      icon: C.onward.icon, label: C.farSide, hint: 'walk in, or press E',
+      radius: 1.35, emits: 1.9,
+      onEnter: function (panel) {
+        arriveLine = h('div', { class: 'pz-adj-arrive' });
+        paintArrive();
+        PS.ui.append(panel, [arriveLine, endChoices()]);
+      },
+      onOpen: function () {
+        paintArrive();
+        if (!puzzle.done || finished) return;
+        arena.ping(exitX, bankY);
+      }
+    });
 
-    PS.ui.append(el, h('div', { class: 'pz-adj' }, [
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-adj-edge' }, [
-          h('span', { text: C.nearSide + ' \u2014 you are here' }),
-          h('span', { text: 'row ' + (gh - 1) + ' is ' + C.farSide })
-        ]),
-        board,
-        h('div', { class: 'pz-note' }, [
-          'A number is how many of that cell\u2019s ', h('strong', { text: 'eight' }),
-          ' neighbours will not hold you. You only need a line of your own footprints to ',
-          C.farSide, ' \u2014 the rest of the ', C.gridWord, ' can stay a mystery. ',
-          'Arrows or WASD to move, ', h('strong', { text: 'F' }), ' to toggle marking.'
-        ])
-      ]),
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'The crossing' }),
-          meter
-        ]),
-        warnBox,
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'Options' }),
-          actionBox
+    function paintArrive() {
+      if (!arriveLine) return;
+      var clean = puzzle.hits === 0;
+      arriveLine.textContent = (puzzle.done ? (clean ? C.clear : C.messy) : 'You are not across yet.') +
+        ' ' + puzzle.steps + ' cells committed to; the shortest line was ' + puzzle.minPath + '.';
+    }
+
+    /* ------------------------------------------------------------ markers -- */
+
+    function addNumber(gx, gy, count) {
+      arena.prop({
+        x: ax(gx), y: ay(gy),
+        icon: count > 0 ? keycap(count) : keycap(0),
+        label: ' ', hint: ' ',
+        trigger: 'press', radius: -1, glow: false, emits: 0,
+        once: false, botSkip: true,
+        onActivate: function () { /* a footprint, not a switch */ }
+      });
+    }
+
+    /* The only props on this floor that the player did not put there are the
+       holes they have already made, and the bot must never go and look for one
+       on purpose — hence botSkip. Untriggered hazards are not props at all:
+       a prop draws a shadow, and a shadow would give the whole board away. */
+    function addHole(gx, gy) {
+      arena.prop({
+        x: ax(gx), y: ay(gy),
+        icon: C.hazardIcon, label: C.hazardWord, hint: 'already gone',
+        trigger: 'press', radius: -1, glow: false, emits: 0,
+        tint: '#e2695f', once: false, botSkip: true,
+        onActivate: function () { api.toast('There is a hole there now.', 'bad', 1200); }
+      });
+    }
+
+    function facingCell() {
+      var pl = arena.player();
+      var cx = Math.cos(pl.facing), cy = Math.sin(pl.facing);
+      var dx = 0, dy = 0;
+      if (Math.abs(cx) >= Math.abs(cy)) dx = cx >= 0 ? 1 : -1;
+      else dy = cy >= 0 ? 1 : -1;
+      return { x: pl.tx + dx, y: pl.ty + dy };
+    }
+
+    /** Point at a cell with the mouse (or just face it) and press F. The mark
+        stops nothing — it is a note to yourself, which is all it ever was. */
+    function toggleMark() {
+      if (finished || !arena) return;
+      var c = facingCell();
+      var gx = c.x - PAD_X, gy = c.y - PAD_Y;
+      if (gx < 0 || gy < 0 || gx >= w || gy >= gh) {
+        api.toast('Nothing to mark that way.', 'info', 1100);
+        return;
+      }
+      var i = gy * w + gx;
+      if (puzzle.revealed[i] !== undefined || puzzle.triggered[i]) return;
+
+      if (puzzle.flags[i]) {
+        delete puzzle.flags[i];
+        if (marks[i]) { marks[i].remove(); delete marks[i]; }
+      } else {
+        puzzle.flags[i] = true;
+        marks[i] = arena.prop({
+          x: c.x, y: c.y, icon: C.flagIcon, label: ' ', hint: ' ',
+          trigger: 'press', radius: -1, glow: false, emits: 0,
+          once: false, botSkip: true, tint: '#e2695f',
+          onActivate: function () { /* your own note */ }
+        });
+        arena.ping(c.x, c.y, '#e2695f');
+      }
+      paintHud();
+    }
+
+    /* -------------------------------------------------------------- steps -- */
+
+    function onStep(tx, ty) {
+      if (finished || !arena) return;
+      var gx = tx - PAD_X, gy = ty - PAD_Y;
+      if (gx < 0 || gy < 0 || gx >= w || gy >= gh) return;   // the banks are safe
+
+      var i = gy * w + gx;
+      puzzle.at = i;
+
+      if (puzzle.hazard[i] && !puzzle.triggered[i] && !puzzle.done) {
+        // Never fatal — expensive. You go through, and you climb back out.
+        puzzle.triggered[i] = true;
+        puzzle.hits++;
+        delete puzzle.flags[i];
+        if (marks[i]) { marks[i].remove(); delete marks[i]; }
+        api.tweak({ health: -puzzle.damage, energy: -4, morale: -6 });
+        api.toast(C.hit[puzzle.hits % C.hit.length], 'bad', 3000);
+        arena.hit('#e2695f');
+        arena.shake(12, 0.46);
+        arena.dust(tx, ty, 16, '#e2695f');
+        addHole(gx, gy);
+        paintHud();
+        return;
+      }
+
+      if (puzzle.revealed[i] === undefined && !puzzle.hazard[i]) {
+        puzzle.revealed[i] = puzzle.counts[i];
+        puzzle.steps++;
+        api.tweak({ energy: -1 });
+        addNumber(gx, gy, puzzle.counts[i]);
+        if (puzzle.counts[i] === 0) arena.ping(tx, ty, '#5fcf8d');
+      }
+
+      if (gy === gh - 1 && !puzzle.done) {
+        puzzle.done = true;
+        api.flash();
+        api.toast('You are on the last of it. ' + C.farSide + ' is one step further.', 'good', 2600);
+        arena.ping(exitX, bankY);
+        if (exitStation) exitStation.pulse();
+      }
+      paintHud();
+    }
+
+    function onTick(dt) {
+      if (finished) return;
+      hudT += dt;
+      if (hudT >= 0.2) { hudT = 0; paintHud(); }
+    }
+
+    /* -------------------------------------------------------------- input -- */
+
+    function onKey(ev) {
+      if (finished) return;
+      if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      if (ev.key === 'f' || ev.key === 'F') { ev.preventDefault(); toggleMark(); }
+    }
+    document.addEventListener('keydown', onKey);
+    teardownFns.push(function () { document.removeEventListener('keydown', onKey); });
+
+    /* ---------------------------------------------------------------- HUD -- */
+
+    var cRow   = arena.chip('Crossed', '\uD83E\uDDED');
+    var cHere  = arena.chip('Under you', '\uD83D\uDC63');
+    var cRead  = arena.chip('Read', '\uD83D\uDD22');
+    var cMark  = arena.chip('Marked', '\uD83D\uDEA9');
+    var cHits  = arena.chip('Through', '\uD83D\uDCA5');
+
+    arena.note('A number counts the ' + C.hazardPlural + ' in the eight cells around it. Stand still and work it out \u2014 the ground is not going anywhere.');
+    arena.button('\uD83D\uDEA9 Mark ahead (F)', toggleMark);
+    arena.button('\u21A9 Go back to ' + C.nearSide, turnBack, 'pz-btn--danger');
+
+    PS.ui.append(wrap, [
+      h('div', { class: 'pz-adj-tips' }, [
+        h('span', {}, [
+          h('b', { class: 'pz-adj-cap', text: 'W A S D' }), ' / ',
+          h('b', { class: 'pz-adj-cap', text: '\u2190\u2191\u2193\u2192' }),
+          ' walk \u00B7 ', h('b', { class: 'pz-adj-cap', text: 'F' }),
+          ' marks the cell you are facing \u00B7 you only need a line of your own footprints to ',
+          h('strong', { text: C.farSide })
         ]),
         h('div', { class: 'pz-adj-legend' }, [
           h('span', {}, [C.playerIcon, ' you']),
           h('span', {}, [C.flagIcon, ' your mark']),
           h('span', {}, [C.hazardIcon, ' ' + C.hazardWord]),
-          h('span', {}, ['\u00B7 nothing adjacent'])
+          h('span', {}, ['shortest crossing ', h('b', { text: puzzle.minPath + ' cells' })])
         ])
       ])
-    ]));
+    ]);
 
-    setMark(false);
-    paint();
+    /* -------------------------------------------------------- hint marker -- */
+    /* core's api.hint() calls engine.hint() and THEN charges morale, which
+       emits a state change. So by the time this listener runs, hint() has
+       already recorded which cell it was talking about, and we can light that
+       patch of ground up instead of making the player parse compass
+       directions. */
+    var offState = state.on(function () {
+      if (finished || !arena) return;
+      if (puzzle.hintCell !== undefined && puzzle.hintCell !== lastHint) {
+        lastHint = puzzle.hintCell;
+        var gx = lastHint % w, gy = Math.floor(lastHint / w);
+        arena.ping(ax(gx), ay(gy), '#5fcf8d');
+      }
+      paintHud();
+    });
+    teardownFns.push(function () { if (offState) offState(); });
+
+    function paintHud() {
+      if (!arena || finished) return;
+      var row = Math.floor(puzzle.at / w);
+      // The number you are standing on is hidden under your own boots, and it
+      // is the one you need most. Put it where you can read it.
+      var pl = arena.player();
+      var here = (pl.ty - PAD_Y) * w + (pl.tx - PAD_X);
+      var onGrid = pl.tx - PAD_X >= 0 && pl.tx - PAD_X < w && pl.ty - PAD_Y >= 0 && pl.ty - PAD_Y < gh;
+      cRow.set(row + ' / ' + (gh - 1), puzzle.done ? 'good' : null);
+      cHere.set(!onGrid ? 'solid' : (puzzle.revealed[here] === undefined
+        ? '\u2014'
+        : puzzle.revealed[here] + ' near'), onGrid && puzzle.revealed[here] > 2 ? 'warn' : null);
+      cRead.set(countKeys(puzzle.revealed) + ' cells');
+      cMark.set(String(countKeys(puzzle.flags)));
+      cHits.set(String(puzzle.hits), puzzle.hits ? 'bad' : null);
+      paintArrive();
+    }
+
+    /* --------------------------------------------------- the opening move -- */
+    /* The starting cell always reads zero, so the crossing always begins with
+       something forced rather than a coin flip. Put that number on the ground
+       before the player has taken a step. */
+    addNumber(puzzle.start % w, Math.floor(puzzle.start / w), puzzle.counts[puzzle.start]);
+
+    paintHud();
+    arena.focus();
   }
 
   function unmount() {
