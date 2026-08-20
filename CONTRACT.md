@@ -691,6 +691,15 @@ it does when the thing it measures is **degenerate rather than wrong**:
 | a solver seeded `safe = {}` | an input set that is **empty** | already-safe cells read as unknown, disabling a deduction rule entirely |
 | a liveness assertion | a sample **too small to contain the event** | short runs failed with nothing wrong |
 | grepping for a marker string | the file **also talks about** the marker | searching for `"FAULT INJECTION"` matched a *comment* about fault injection and reported broken code that was already fixed |
+| a differential harness | **both arms are the same code** | comparing a fixed function against itself reported `0.0% lost`, which reads as a clean result |
+
+**If you write a differential, confirm the control reproduces the bug first.** That last
+row is the one with a detector cheap enough to always apply: if your "before" arm does
+not show the defect, you do not have a before — you have one arm run twice, and it will
+report no difference very convincingly. One assertion catches it, and it generalises to
+every A/B, benchmark and regression harness in this repo. It matters more than the
+others because it *cannot* fail loudly: a differential with identical arms fails
+flatteringly, and flattering results get believed and shipped.
 
 A guard that cannot verify something should say so, not pass quietly and not fail
 loudly. The liveness check is the worked example: below its floor it prints what it
@@ -706,7 +715,9 @@ figure for how much detection was lost, taken from the report that found the bug
 independent re-measurement with a different sampling regime got a materially different
 number — both were real measurements of a real bug, but the magnitude turned out to
 depend heavily on how much of the board had been revealed. **State the mechanism, which
-reproduces; be careful quoting a headline number that might not.**
+reproduces; be careful quoting a headline number that might not.** That is the same
+*degrade honestly* rule applied to documentation rather than to code: the corrected row
+claims the thing that reproduces and declines to claim the thing that doesn't.
 
 And the last row is worth reading twice, because it is the general case of the other
 five. A marker is a **proxy** for the property you care about, and a proxy drifts from
