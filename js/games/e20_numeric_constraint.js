@@ -542,6 +542,7 @@
     var rowKnown = [], colKnown = [];
     var rowHandles = [], colHandles = [];
     var cCounted = null, cLeft = null;
+    var noteEl = null;
     var r00, c00;
     for (r00 = 0; r00 < k; r00++) { rowKnown.push(false); colKnown.push(false); }
 
@@ -815,7 +816,7 @@
         onEnter: function (panelEl) { PS.ui.append(panelEl, panelRoot); }
       });
 
-      arena.note('Count the ' + (C.rowThing || 'shelves') + ' and the ' + (C.colThing || 'bins') +
+      noteEl = arena.note('Count the ' + (C.rowThing || 'shelves') + ' and the ' + (C.colThing || 'bins') +
         ' first \u2014 the totals are on them, not in the book. Then work the sheet at the desk.');
       return true;
     }
@@ -843,7 +844,7 @@
     /* -------------------------------------------------------------- input -- */
 
     function pick(r, c) {
-      if (finished) return;
+      if (finished || puzzle.solved) return;
       sel = [r, c];
       paint();
     }
@@ -922,7 +923,7 @@
       var name = puzzle.rowLabels[puzzle.shortRow].toLowerCase();
       if (arena) {
         arena.closePanel();
-        arena.note(C.solvedLine);
+        if (noteEl) noteEl.textContent = C.solvedLine;
       }
       // The count is closed: the sheet and both signing buttons go dead, so a
       // solved ledger can never be signed off blind afterwards.

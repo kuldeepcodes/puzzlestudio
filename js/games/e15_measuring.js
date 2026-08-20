@@ -508,6 +508,7 @@
     var handles = [];             // arena prop handles, one per vessel
     var chips = [];
     var cMoves = null;
+    var noteEl = null;
 
     var stage = h('div', { class: 'pz-measure-stage' });
     var mapHost = h('div', {});
@@ -599,7 +600,9 @@
       for (i = 0; i < n; i++) {
         (function (idx) {
           var spot = room.spots[String(idx + 1)];
-          if (!spot) return;
+          // Push either way, so handles stay index-aligned with the vessels
+          // however many capacities the tier deals out.
+          if (!spot) { handles.push(null); return; }
           handles.push(arena.prop({
             x: spot.x, y: spot.y, icon: C.icons[idx] || '\uD83E\uDDF4',
             label: LETTERS[idx], hint: 'walk onto it',
@@ -640,7 +643,7 @@
         });
       }
 
-      arena.note(puzzle.sealed
+      noteEl = arena.note(puzzle.sealed
         ? C.sealed + ' Walk onto a vessel to pick it up, then onto another to pour.'
         : 'Walk onto a vessel to pick it up. Carry it to ' + C.source + ' to fill it, to ' +
           (C.drain || 'the drain') + ' to tip it out, or onto another vessel to pour.');
@@ -820,7 +823,7 @@
     function succeed() {
       var clean = puzzle.moves <= puzzle.par;
       if (arena) {
-        arena.note(C.solve.replace('%T%', String(puzzle.target)));
+        if (noteEl) noteEl.textContent = C.solve.replace('%T%', String(puzzle.target));
         var p = arena.player();
         arena.ping(p.tx, p.ty, '#5fcf8d');
       }

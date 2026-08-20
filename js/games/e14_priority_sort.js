@@ -418,6 +418,7 @@
     var arena = null;
     var seenIds = {};       // entry id -> assessed in person
     var cSeen = null, cCost = null;
+    var noteEl = null;
 
     var stage = h('div', { class: 'pz-prio-stage' });
     var mapHost = h('div', {});
@@ -601,7 +602,7 @@
         onEnter: function (panelEl) { PS.ui.append(panelEl, panelRoot); }
       });
 
-      arena.note('Go round the bays first \u2014 nothing on the board fills itself in. Then set ' +
+      noteEl = arena.note('Go round the bays first \u2014 nothing on the board fills itself in. Then set ' +
         C.queueWord + ' at the board.');
       return true;
     }
@@ -716,7 +717,7 @@
       var blind = puzzle.entries.length - assessedCount();
       if (arena) {
         arena.closePanel();
-        arena.note(C.done);
+        if (noteEl) noteEl.textContent = C.done;
       }
 
       PS.ui.clear(actionBox);

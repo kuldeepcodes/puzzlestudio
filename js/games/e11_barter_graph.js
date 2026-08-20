@@ -490,6 +490,9 @@
     var cards = [];
     var stations = [];
     var cTrades = null, cLeft = null, cHold = null;
+    var noteEl = null;
+    var NOTE = 'Nobody down here posts a rate. Walk up to a ' + C.traderWord +
+      ' to see what they take \u2014 what you are carrying goes with you.';
 
     /* Goods only appear in the pack row once they have passed through your
        hands (plus the target, always, so you never lose sight of the point).
@@ -571,7 +574,7 @@
       for (j = 0; j < tr.offers.length; j++) if (puzzle.offers[tr.offers[j]].brokered) brokeredHere = true;
 
       var hold = h('div', { class: 'pz-barter-hold' });
-      holdBoxes.push(hold);
+      if (inPanel) holdBoxes.push(hold);
 
       var card = h('div', { class: 'pz-barter-node' + (inPanel ? ' is-panel' : '') }, [
         brokeredHere ? h('div', { class: 'pz-barter-flag', text: 'brokered' }) : null,
@@ -630,6 +633,12 @@
         warnBox.appendChild(h('div', { class: 'pz-barter-stuck' },
           ['You have traded yourself into a corner \u2014 nothing on these ' + C.tableWord +
             's turns what you are holding into what you need. Walk a trade back.']));
+        // The side panel is not on screen in the arena, so the same warning has
+        // to reach the player where they are actually standing.
+        if (noteEl) noteEl.textContent = 'You have traded yourself into a corner. Nothing on these ' +
+          C.tableWord + 's turns what you are holding into what you need \u2014 take a trade back.';
+      } else if (noteEl && !puzzle.done) {
+        noteEl.textContent = NOTE;
       }
 
       function row(k, v, warn) {
@@ -720,8 +729,7 @@
         })(i);
       }
 
-      arena.note('Nobody down here posts a rate. Walk up to a ' + C.traderWord +
-        ' to see what they take \u2014 what you are carrying goes with you.');
+      noteEl = arena.note(NOTE);
       arena.button('\u21A9 Take that back', undo, 'pz-btn--sm');
       arena.button('\uD83D\uDEB6 Walk away', walkAway, 'pz-btn--danger');
       return true;
@@ -786,7 +794,7 @@
       for (var s = 0; s < stations.length; s++) stations[s].solve();
       if (arena) {
         arena.closePanel();
-        arena.note('You have it. Nothing else on this ' + C.tableWord + ' is worth what it costs.');
+        if (noteEl) noteEl.textContent = 'You have it. Nothing else on this ' + C.tableWord + ' is worth what it costs.';
       }
 
       PS.ui.clear(actionBox);
