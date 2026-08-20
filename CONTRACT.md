@@ -756,6 +756,16 @@ been fixed. A measurement that isn't asking the question it appears to ask is si
 argument for fault injection over reasoning about a check: injecting the failure pins
 the measurement to the property in both directions at once.
 
+Since you cannot control which way a broken check lands, **build them to fail toward
+caution.** The two newest rows above caught each other within an hour of being written:
+a marker-string guard, added specifically to prevent "the control is secretly the
+treatment", was itself defeated by the marker-as-proxy failure. It fired a false
+*positive* — claiming a control was contaminated when it wasn't — and cost ten minutes
+to disprove. Had it failed the other way it would have matched nothing, the broken
+control would have shipped, and the measurement built on it would have been believed.
+Same bug, same probability, wildly different price. A guard that cries wolf is cheap; a
+guard that stays quiet when it should not is the one that costs you the result.
+
 ---
 
 ## 14. A complete minimal engine, heavily commented
