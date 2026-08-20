@@ -322,16 +322,84 @@
     return out;
   }
 
+  /* =============================================================== FLOOR ==
+     The place the pile is lying in. Derived from the puzzle, never from the
+     rng, so build() keeps every draw it already made and a seed still lays
+     the same store out the same way twice.                                 */
+
+  var STORE_W = 23, STORE_H = 15;
+
+  /** FNV-1a. Deterministic, cheap, and not Math.random — replays matter. */
+  function hashOf(str) {
+    var v = 2166136261, i;
+    str = String(str);
+    for (i = 0; i < str.length; i++) { v ^= str.charCodeAt(i); v = (v * 16777619) >>> 0; }
+    return v >>> 0;
+  }
+
+  function buildFloor(puzzle, skinId) {
+    var W = STORE_W, H = STORE_H, x, y, i;
+    var tiles = [];
+    for (y = 0; y < H; y++) {
+      var row = [];
+      for (x = 0; x < W; x++) row.push((x === 0 || y === 0 || x === W - 1 || y === H - 1) ? 1 : 0);
+      tiles.push(row);
+    }
+
+    var seed = hashOf(skinId + '|' + puzzle.cap + '|' + puzzle.items.length + '|' + puzzle.optimal);
+    var exitY = (H - 1) >> 1;
+
+    /* Racking. Three runs of shelving with a gap punched through each, and a
+       clear aisle down both sides — so the floor is one connected space and
+       the exit is always walkable to from anywhere in it. */
+    for (i = 0; i < 3; i++) {
+      var sy = 3 + i * 4;
+      var gap = 4 + ((seed >>> (i * 3)) % 6) * 2;          // 4,6,8,10,12,14
+      for (x = 3; x <= W - 5; x++) {
+        if (x >= gap && x <= gap + 1) continue;             // the way through
+        if (Math.abs(sy - exitY) <= 1 && x >= W - 7) continue;   // keep the exit mouth clear
+        tiles[sy][x] = 1;
+      }
+    }
+
+    var spawn = { x: 1, y: H - 2 };
+    var exit  = { x: W - 2, y: exitY };
+
+    /* Where things lie. Every open tile that is not the exit mouth or the
+       spot you are standing on, walked in a fixed order and then spread so
+       the pile is genuinely all over the floor rather than in one heap. */
+    var open = [];
+    for (y = 1; y <= H - 2; y++) {
+      for (x = 1; x <= W - 2; x++) {
+        if (tiles[y][x]) continue;
+        if (Math.abs(x - exit.x) + Math.abs(y - exit.y) <= 2) continue;
+        if (Math.abs(x - spawn.x) + Math.abs(y - spawn.y) <= 1) continue;
+        open.push({ x: x, y: y });
+      }
+    }
+
+    var count = Math.max(1, puzzle.items.length);
+    var spots = [];
+    for (i = 0; i < count && open.length; i++) {
+      spots.push(open[(Math.round(i * open.length / count) + (seed % 7)) % open.length]);
+    }
+
+    return { w: W, h: H, tiles: tiles, spawn: spawn, exit: exit, open: open, spots: spots, seed: seed };
+  }
+
+  /** A stable, spread-out spot for the n-th thing to be lying in. */
+  function spotFor(floor, n) {
+    if (floor.spots[n]) return floor.spots[n];
+    if (!floor.open.length) return { x: floor.spawn.x, y: floor.spawn.y };
+    return floor.open[(n * 7 + floor.seed) % floor.open.length];
+  }
+
   /* ================================================================ CSS == */
 
   var CSS = [
-    '.pz-knap{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(260px,1fr);gap:18px;align-items:start}',
-    '@media (max-width:880px){.pz-knap{grid-template-columns:1fr}}',
-
-    '.pz-knap-grid{display:grid;gap:9px;grid-template-columns:repeat(auto-fill,minmax(168px,1fr))}',
     '.pz-knap-obj{display:grid;grid-template-columns:auto minmax(0,1fr);gap:9px;align-items:start;text-align:left;',
     '  padding:10px 11px;border-radius:10px;border:1px solid var(--line);color:var(--text);',
-    '  background:linear-gradient(180deg,var(--panel-2),var(--panel));cursor:pointer;',
+    '  background:linear-gradient(180deg,var(--panel-2),var(--panel));cursor:pointer;width:100%;',
     '  transition:transform .16s var(--ease),border-color .16s var(--ease),opacity .16s var(--ease)}',
     '.pz-knap-obj:hover:not(:disabled){transform:translateY(-2px);border-color:var(--acc)}',
     '.pz-knap-obj:disabled{cursor:default;opacity:.34}',
@@ -342,6 +410,9 @@
     '.pz-knap-obj__u{font-size:11px;color:var(--dim);line-height:1.45;margin-top:3px}',
     '.pz-knap-obj__m{display:flex;gap:9px;align-items:center;margin-top:5px;',
     '  font-family:var(--font-mono);font-size:11px;color:var(--text-2)}',
+
+    '.pz-knap-grid{display:grid;gap:9px;grid-template-columns:repeat(auto-fill,minmax(168px,1fr))}',
+    '.pz-knap-hold{display:flex;flex-direction:column;gap:8px}',
 
     '.pz-knap-pips{display:inline-flex;gap:2px}',
     '.pz-knap-pip{width:7px;height:7px;border-radius:50%;background:var(--line);display:inline-block}',
@@ -354,11 +425,6 @@
     '.pz-knap-bar__f{height:100%;width:0%;border-radius:6px;background:linear-gradient(90deg,var(--acc),var(--acc-2));',
     '  transition:width .3s var(--ease)}',
     '.pz-knap-bar.is-full .pz-knap-bar__f{background:linear-gradient(90deg,#e6b455,#e2695f)}',
-
-    '.pz-knap-pack{display:flex;flex-wrap:wrap;gap:6px;min-height:34px}',
-    '.pz-knap-tag{display:inline-flex;gap:5px;align-items:center;padding:4px 8px;border-radius:999px;',
-    '  border:1px solid var(--line);background:var(--panel-2);font-size:11px;color:var(--text-2)}',
-    '.pz-knap-tag.is-combo{border-color:var(--acc-2);color:var(--acc-2)}',
 
     '.pz-knap-lash{display:flex;flex-direction:column;gap:8px}',
     '.pz-knap-lash__b{display:grid;grid-template-columns:auto minmax(0,1fr);gap:9px;align-items:center;text-align:left;',
@@ -387,9 +453,14 @@
     var C = puzzle.content;
     var N = puzzle.names;
     var finished = false;
+    var arena = null;
+    var exitStation = null;
+    var props = {};                 // uid -> arena prop handle, for what is still on the floor
+    var nextSpot = 0;
 
-    var grid    = h('div', { class: 'pz-knap-grid' });
-    var packBox = h('div', { class: 'pz-knap-pack' });
+    var floor = buildFloor(puzzle, skin.id);
+
+    var holdBox = h('div', { class: 'pz-knap-hold' });
     var lashBox = h('div', { class: 'pz-knap-lash' });
     var knownBox = h('div', { class: 'pz-knap-known' });
     var warnBox = h('div', {});
@@ -397,10 +468,12 @@
     var bar     = h('div', { class: 'pz-knap-bar' }, [barFill]);
     var scaleTxt = h('div', { class: 'pz-knap-scale__t' });
     var actions = h('div', { class: 'pz-col' });
+    var floorBox = h('div', { class: 'pz-knap-grid' });     // degraded mode only
 
     function label(it) { return (N[it.key] && N[it.key].n) || PS.state.prettify(it.key); }
     function icon(it)  { return (N[it.key] && N[it.key].i) || '\uD83D\uDCE6'; }
     function useLine(it) { return PART_BY_KEY[it.key].use; }
+    function fits(it) { return (loadOf(puzzle) + it.w) <= puzzle.cap; }
 
     function pipRow(v) {
       var kids = [], on = pips(v);
@@ -408,18 +481,110 @@
       return h('span', { class: 'pz-knap-pips' }, kids);
     }
 
-    /* ------------------------------------------------------------- render */
+    /* =========================================================== THE FLOOR =
+       One invariant, and everything else follows from it: an object is either
+       on your back or it is lying on the ground with a prop under it. */
 
-    function paintGrid() {
-      PS.ui.clear(grid);
+    function putOnFloor(it, at) {
+      if (!arena || props[it.uid] || finished) return;
+      var spot = at || spotFor(floor, nextSpot++);
+      var handle = arena.prop({
+        x: spot.x, y: spot.y,
+        icon: icon(it),
+        label: label(it),
+        hint: it.w + ' kg \u00B7 walk onto it',
+        trigger: 'step',
+        once: false,
+        radius: 0.62,
+        emits: it.combo ? 0.9 : 0.45,
+        onActivate: function () { takeFromFloor(it); }
+      });
+      props[it.uid] = handle;
+    }
+
+    function takeFromFloor(it) {
+      if (finished || inPack(puzzle, it.uid)) return;
+      if (puzzle.committed) { api.toast('The pack is on. You are not opening it again in here.', 'bad', 1600); return; }
+      if (!fits(it)) {
+        api.toast(C.overweight, 'bad', 1600);
+        if (arena) arena.shake(4, 0.22);
+        paintAll();
+        return;
+      }
+      puzzle.pack.push(it.uid);
+      if (props[it.uid]) { props[it.uid].remove(); delete props[it.uid]; }
+      api.toast('You shoulder the ' + label(it).toLowerCase() + '. ' + loadOf(puzzle) + ' of ' + puzzle.cap + ' kg.', 'good', 1900);
+      paintAll();
+    }
+
+    /** Take it off your back and leave it where you are standing. */
+    function putDown(it) {
+      if (finished) return;
+      var at = puzzle.pack.indexOf(it.uid);
+      if (at < 0) return;
+      puzzle.pack.splice(at, 1);
+      if (arena) {
+        var p = arena.player();
+        putOnFloor(it, freeNear(p.tx, p.ty));
+        arena.dust(p.tx, p.ty, 6);
+      }
+      paintAll();
+    }
+
+    /** The nearest open tile to (x,y) with nothing already lying on it. */
+    function freeNear(x, y) {
+      var RINGS = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1], [2, 0], [-2, 0], [0, 2], [0, -2]];
+      for (var r = 0; r < RINGS.length; r++) {
+        var tx = x + RINGS[r][0], ty = y + RINGS[r][1];
+        if (!arena.walkable(tx, ty)) continue;
+        var clash = false;
+        for (var uid in props) {
+          if (props[uid] && props[uid].x === tx && props[uid].y === ty) { clash = true; break; }
+        }
+        if (!clash) return { x: tx, y: ty };
+      }
+      return { x: x, y: y };
+    }
+
+    /** Anything in the world that is not on your back has to be on the floor. */
+    function syncFloor() {
+      if (!arena) return;
+      var uid;
+      for (uid in props) {
+        if (!props[uid]) continue;
+        if (!byUid(puzzle, uid) || inPack(puzzle, uid)) { props[uid].remove(); delete props[uid]; }
+      }
       for (var i = 0; i < puzzle.items.length; i++) {
+        var it = puzzle.items[i];
+        if (inPack(puzzle, it.uid) || props[it.uid]) continue;
+        var p = arena.player();
+        putOnFloor(it, freeNear(p.tx, p.ty));
+      }
+      // What you plainly cannot lift any more stops advertising itself.
+      for (uid in props) {
+        if (!props[uid]) continue;
+        var item = byUid(puzzle, uid);
+        if (!item) continue;
+        var ok = fits(item);
+        props[uid].raw.tint = ok ? null : '#e2695f';
+        props[uid].raw.hint = ok ? (item.w + ' kg \u00B7 walk onto it') : (item.w + ' kg \u00B7 too much for your back');
+      }
+    }
+
+    /* ============================================================== PANELS */
+
+    function paintHold() {
+      PS.ui.clear(holdBox);
+      var c = carried(puzzle);
+      if (!c.length) {
+        holdBox.appendChild(h('span', { class: 'pz-note', text: 'Empty. You are going out of here with your hands.' }));
+      }
+      for (var i = 0; i < c.length; i++) {
         (function (it) {
-          var packed = inPack(puzzle, it.uid);
-          var wouldFit = packed || (loadOf(puzzle) + it.w) <= puzzle.cap;
           var btn = h('button', {
             type: 'button',
-            class: 'pz-knap-obj' + (packed ? ' is-packed' : '') + (it.combo ? ' is-combo' : ''),
-            disabled: finished || (!packed && !wouldFit)
+            class: 'pz-knap-obj is-packed' + (it.combo ? ' is-combo' : ''),
+            disabled: finished || puzzle.committed
           }, [
             h('div', { class: 'pz-knap-obj__i', text: icon(it) }),
             h('div', {}, [
@@ -428,27 +593,13 @@
               h('div', { class: 'pz-knap-obj__m' }, [
                 h('span', { text: it.w + ' kg' }),
                 pipRow(it.v),
-                packed ? h('span', { text: '\u2713 packed' }) : null
+                h('span', { text: '\u2193 put it down' })
               ])
             ])
           ]);
-          btn.addEventListener('click', function () { toggle(it.uid); });
-          grid.appendChild(btn);
-        })(puzzle.items[i]);
-      }
-    }
-
-    function paintPack() {
-      PS.ui.clear(packBox);
-      var c = carried(puzzle);
-      if (!c.length) {
-        packBox.appendChild(h('span', { class: 'pz-note', text: 'Empty. You are going out of here with your hands.' }));
-      }
-      for (var i = 0; i < c.length; i++) {
-        packBox.appendChild(h('span', { class: 'pz-knap-tag' + (c[i].combo ? ' is-combo' : '') }, [
-          h('span', { text: icon(c[i]) }),
-          h('span', { text: label(c[i]) })
-        ]));
+          btn.addEventListener('click', function () { putDown(it); });
+          holdBox.appendChild(btn);
+        })(c[i]);
       }
 
       var load = loadOf(puzzle);
@@ -522,23 +673,49 @@
       }
     }
 
-    function paintAll() { paintGrid(); paintPack(); paintLash(); paintKnown(); }
+    /** Degraded mode only: the pile as a list of buttons. */
+    function paintFloorList() {
+      if (!floorBox.parentNode) return;
+      PS.ui.clear(floorBox);
+      for (var i = 0; i < puzzle.items.length; i++) {
+        (function (it) {
+          if (inPack(puzzle, it.uid)) return;
+          var btn = h('button', {
+            type: 'button',
+            class: 'pz-knap-obj' + (it.combo ? ' is-combo' : ''),
+            disabled: finished || puzzle.committed || !fits(it)
+          }, [
+            h('div', { class: 'pz-knap-obj__i', text: icon(it) }),
+            h('div', {}, [
+              h('div', { class: 'pz-knap-obj__n', text: label(it) }),
+              h('div', { class: 'pz-knap-obj__u', text: useLine(it) }),
+              h('div', { class: 'pz-knap-obj__m' }, [h('span', { text: it.w + ' kg' }), pipRow(it.v)])
+            ])
+          ]);
+          btn.addEventListener('click', function () { takeFromFloor(it); });
+          floorBox.appendChild(btn);
+        })(puzzle.items[i]);
+      }
+    }
+
+    function paintHud() {
+      if (!arena || finished) return;
+      var load = loadOf(puzzle);
+      var pct = Math.round((load / puzzle.cap) * 100);
+      var tone = load >= puzzle.cap ? 'bad' : (pct >= 75 ? 'warn' : null);
+      mLoad.set(pct, load + ' / ' + puzzle.cap + ' kg', tone);
+      cCarry.set(String(carried(puzzle).length));
+      var made = 0;
+      for (var i = 0; i < COMBOS.length; i++) if (puzzle.found[COMBOS[i].key]) made++;
+      cRig.set(made + ' / ' + puzzle.combos.length);
+    }
+
+    function paintAll() {
+      syncFloor();
+      paintHold(); paintLash(); paintKnown(); paintFloorList(); paintHud();
+    }
 
     /* ------------------------------------------------------------ actions */
-
-    function toggle(uid) {
-      if (finished) return;
-      var it = byUid(puzzle, uid);
-      if (!it) return;
-      var at = puzzle.pack.indexOf(uid);
-      if (at >= 0) {
-        puzzle.pack.splice(at, 1);
-      } else {
-        if (loadOf(puzzle) + it.w > puzzle.cap) { api.toast(C.overweight, 'bad', 1600); return; }
-        puzzle.pack.push(uid);
-      }
-      paintAll();
-    }
 
     function lash(r) {
       if (finished) return;
@@ -586,6 +763,7 @@
       if (at >= 0) puzzle.pack.splice(at, 1);
       var ix = puzzle.items.indexOf(it);
       if (ix >= 0) puzzle.items.splice(ix, 1);
+      if (props[it.uid]) { props[it.uid].remove(); delete props[it.uid]; }
     }
 
     /* ----------------------------------------------------------- the exit */
@@ -593,6 +771,7 @@
     function commit() {
       if (finished || puzzle.committed) return;
       puzzle.committed = true;
+      if (exitStation) exitStation.solve();
       paintAll();
       PS.ui.clear(actions);
 
@@ -690,26 +869,17 @@
       });
     }
 
-    /* ------------------------------------------------------------- layout */
-
     PS.ui.append(actions, [
-      h('button', { class: 'pz-btn pz-btn--primary', type: 'button', onclick: commit }, ['\uD83C\uDF92 Shoulder the pack']),
-      h('button', { class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button', onclick: abandon }, ['\u21A9 Leave it all'])
+      h('button', { class: 'pz-btn pz-btn--primary', type: 'button', onclick: commit }, ['\uD83C\uDF92 Shoulder the pack'])
     ]);
 
-    PS.ui.append(el, h('div', { class: 'pz-knap' }, [
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-note' }, [
-          'Click to pack and unpack. Everything you carry out ',
-          h('strong', { text: 'stays with you' }), ' \u2014 this is the pack you have in the next room.'
-        ]),
-        grid
-      ]),
-      h('div', { class: 'pz-col' }, [
+    /** The packing panel, wherever it is being shown. Built once. */
+    function packPanel(host) {
+      PS.ui.append(host, [
         h('div', { class: 'pz-card' }, [
           h('div', { class: 'pz-card__head', text: 'What your back will take' }),
           h('div', { class: 'pz-knap-scale' }, [scaleTxt, bar]),
-          packBox,
+          holdBox,
           warnBox
         ]),
         h('div', { class: 'pz-card' }, [
@@ -721,10 +891,71 @@
           h('div', { class: 'pz-card__head', text: 'Go' }),
           actions
         ])
-      ])
-    ]));
+      ]);
+    }
+
+    /* ------------------------------------------------------- degraded mode --
+       arena.js is core and always present in index.html, but never let a
+       missing layer strand the player in a store they cannot pack in.       */
+
+    if (!PS.arena || typeof PS.arena.create !== 'function') return renderFlat();
+
+    /* ============================================================== ARENA = */
+
+    var host = h('div', {});
+    PS.ui.append(el, host);
+
+    arena = PS.arena.create(host, {
+      map: { w: floor.w, h: floor.h, tiles: floor.tiles },
+      spawn: floor.spawn,
+      light: state.stats.light,
+      avatar: '\uD83E\uDDCD'
+    });
+    if (!arena) return renderFlat();
+    teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
+
+    var mLoad = arena.meter('Load', '\uD83C\uDF92');
+    var cCarry = arena.chip('Carrying', '\uD83D\uDCE6');
+    var cRig = arena.chip('Rigged', '\uD83D\uDD17');
+
+    arena.note('Walk over a thing to shoulder it. What you can lift is what you leave with.');
+    arena.button('\u21A9 Leave it all', abandon, 'pz-btn--danger');
+
+    for (var i0 = 0; i0 < puzzle.items.length; i0++) {
+      if (!inPack(puzzle, puzzle.items[i0].uid)) putOnFloor(puzzle.items[i0], spotFor(floor, nextSpot++));
+    }
+
+    exitStation = arena.station({
+      x: floor.exit.x, y: floor.exit.y,
+      icon: '\uD83D\uDEAA', label: 'The way out',
+      hint: 'pack it properly here',
+      radius: 1.45, emits: 2.2,
+      onEnter: function (panelEl) { packPanel(panelEl); }
+    });
 
     paintAll();
+    arena.focus();
+
+    /* ------------------------------------------------------------ flat UI --
+       No canvas layer: the pile becomes the list it used to be, so the pack
+       can still be built, rigged and carried out.                           */
+
+    function renderFlat() {
+      var col = h('div', { class: 'pz-col' });
+      actions.appendChild(h('button', {
+        class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button', onclick: abandon
+      }, ['\u21A9 Leave it all']));
+      packPanel(col);
+      PS.ui.append(el, h('div', { class: 'pz-col' }, [
+        h('div', { class: 'pz-note' }, [
+          'Everything you carry out ', h('strong', { text: 'stays with you' }),
+          ' \u2014 this is the pack you have in the next room.'
+        ]),
+        floorBox,
+        col
+      ]));
+      paintAll();
+    }
   }
 
   function unmount() {
