@@ -473,7 +473,21 @@
      yard that same route has to be WALKABLE, so every number below is set
      against one fact: the player tops out at 5 tiles a second and the fastest
      thing watching them does 2.6. A three-to-one speed advantage is what turns
-     a proof into something you can actually do with your hands. */
+     a proof into something you can actually do with your hands.
+
+     LOAD-BEARING. That margin is not tuning, it is what carries the solver's
+     tick-space guarantee into continuous time: a tile costs the player ~0.2s
+     and the guard ~0.65s, so every gap the BFS found has slack measured in
+     seconds. The 5.0 is `MAX_SPEED` in js/core/arena.js and is NOT declared
+     here — raising a speed below, lowering MAX_SPEED, or adding a patrol that
+     sprints breaks the proof silently. The board would still claim to be
+     crossable and would no longer be. Re-verify against the generator if you
+     touch any of it.
+
+     Two further slacks run the same way, and both are deliberate: a cone does
+     not see behind itself where the old turn-based vision did, and detection
+     is line-of-sight checked against walls where the old model ignored them.
+     Both only ever ADD room, which is the safe direction for a guarantee. */
 
   var WALK_SPEED = 1.55;      // tiles/s — a bored man pacing a corridor
   var WALK_WAIT  = 0.5;       // beat at each end of the beat, so you can read it

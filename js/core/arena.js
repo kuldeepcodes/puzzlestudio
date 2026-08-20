@@ -28,7 +28,20 @@
   var EMOJI_FONT = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",system-ui,sans-serif';
   var UI_FONT = '"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif';
 
-  /* Movement feel. These four numbers are the whole game. */
+  /* Movement feel. These four numbers are the whole game.
+
+     MAX_SPEED is depended on OUTSIDE this file. e19_patrol_routing sets its
+     patrol speeds against it (1.55 and 2.6 tiles/s) to carry a tick-space
+     solvability proof into continuous time — the margin is what guarantees the
+     proven route stays walkable. Lowering it silently invalidates that proof:
+     the board would still claim to be crossable and would no longer be.
+
+     DECEL is load-bearing in a subtler way. The ~0.38-tile release slide it
+     produces means a player can arrive somewhere they had not finished
+     reasoning about, which is why e13_adjacency_deduction classifies a hazard
+     step as a misread only when the cell was provably bad from what the player
+     had already uncovered. Any engine that reads a positional mistake as
+     evidence about the player's thinking depends on this number. */
   var ACCEL = 44;          // tiles/s^2 while a direction is held
   var MAX_SPEED = 5.0;     // tiles/s
   var DECEL = 30;          // tiles/s^2 once input stops — a short, weighty slide
