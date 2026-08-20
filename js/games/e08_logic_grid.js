@@ -689,7 +689,18 @@
 
     /* -------------------------------------------------------------- paint -- */
 
+    /* Walking away is irreversible, so it asks once and anything else you
+       touch stands it back down. */
+    var quitArmed = false;
+
+    function disarmQuit() {
+      if (!quitArmed) return;
+      quitArmed = false;
+      walkBtn.textContent = '\u21A9 Give up on it';
+    }
+
     function paint() {
+      disarmQuit();
       paintBoard(puzzle.markObj, objCells);
       paintBoard(puzzle.markTime, timeCells);
 
@@ -936,7 +947,6 @@
       });
 
       arena.note(C.roomNote);
-      arena.button('\u21A9 Give up on it', giveUp, 'pz-btn--danger');
       arena.focus();
       return true;
     }
@@ -960,7 +970,16 @@
       brokenClue = -1;
       paint();
     });
-    walkBtn.addEventListener('click', giveUp);
+    walkBtn.addEventListener('click', function () {
+      if (finished) return;
+      if (!quitArmed) {
+        quitArmed = true;
+        walkBtn.textContent = '\u21A9 Really give up on it?';
+        api.toast('Press it again if you mean it.', 'bad', 2600);
+        return;
+      }
+      giveUp();
+    });
 
     var objLabels = [], timeLabels = [];
     for (var i = 0; i < n; i++) {
@@ -1002,7 +1021,7 @@
     /* Built once. The terminal hands these exact nodes back every time you walk
        up to it, so a half-marked grid survives going out for one more clue. */
     var panelStack = h('div', { class: 'pz-lgrid-panel' }, [
-      boards, howNote, readCard, buttonRow, endBox, cluesCard, whoCard, caseCard, warnBox
+      boards, howNote, readCard, buttonRow, endBox, cluesCard, whoCard, caseCard, warnBox, walkBtn
     ]);
 
     var arenaOk = false;

@@ -486,7 +486,18 @@
 
     /* --------------------------------------------------------- the output */
 
+    /* Giving up is irreversible, so it asks once, and anything else you touch
+       stands it back down. */
+    var quitArmed = false;
+
+    function disarmQuit() {
+      if (!quitArmed) return;
+      quitArmed = false;
+      giveUpBtn.textContent = '\u21A9 Give up on it';
+    }
+
     function paintOut() {
+      disarmQuit();
       PS.ui.clear(outBox);
       if (!gotSignal()) {
         outBox.className = 'pz-ciph-out';
@@ -532,6 +543,7 @@
 
     /** Both errands gate their own half of the desk, and neither is optional. */
     function syncGates() {
+      disarmQuit();
       PS.ui.clear(toolBox);
       if (!gotKey()) {
         toolBox.appendChild(h('div', { class: 'pz-ciph-locked' }, [
@@ -943,7 +955,6 @@
       });
 
       arena.note(C.roomNote);
-      arena.button('\u21A9 Give up on it', walkAway, 'pz-btn--danger');
       arena.focus();
       return true;
     }
@@ -951,8 +962,17 @@
     /* ------------------------------------------------------------- layout */
 
     confirmBtn.addEventListener('click', confirmRead);
-    giveUpBtn.addEventListener('click', walkAway);
-    PS.ui.append(actions, [confirmBtn]);
+    giveUpBtn.addEventListener('click', function () {
+      if (finished || puzzle.solved) return;
+      if (!quitArmed) {
+        quitArmed = true;
+        giveUpBtn.textContent = '\u21A9 Really give up on it?';
+        api.toast('Press it again if you mean it.', 'bad', 2600);
+        return;
+      }
+      walkAway();
+    });
+    PS.ui.append(actions, [confirmBtn, giveUpBtn]);
 
     var tool = puzzle.mode === 'caesar' ? buildDial()
              : puzzle.mode === 'keyword' ? buildPad()
@@ -987,7 +1007,6 @@
     if (!arenaOk) {
       /* Degraded mode: the whole desk in front of you, nothing to walk to. */
       arena = null;
-      actions.appendChild(giveUpBtn);
       PS.ui.append(el, panelStack);
     }
 

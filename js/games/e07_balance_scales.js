@@ -405,7 +405,18 @@
 
     var suspects = [];
 
+    /* Walking out with an untested batch is irreversible, so it asks once and
+       anything else you touch stands it back down. */
+    var quitArmed = false;
+
+    function disarmQuit() {
+      if (!quitArmed) return;
+      quitArmed = false;
+      walkBtn.textContent = '\u21A9 Take the batch untested';
+    }
+
     function paint() {
+      disarmQuit();
       suspects = suspectItems(puzzle);
 
       PS.ui.clear(panL); PS.ui.clear(panR); PS.ui.clear(tray); PS.ui.clear(floorBox);
@@ -733,7 +744,6 @@
       });
 
       arena.note(C.roomNote);
-      arena.button('\u21A9 Take the batch untested', walkAway, 'pz-btn--danger');
       arena.focus();
       return true;
     }
@@ -763,7 +773,16 @@
       if (!declaring) named = null;
       paint();
     });
-    walkBtn.addEventListener('click', walkAway);
+    walkBtn.addEventListener('click', function () {
+      if (finished) return;
+      if (!quitArmed) {
+        quitArmed = true;
+        walkBtn.textContent = '\u21A9 Really take it untested?';
+        api.toast('Press it again if you mean it \u2014 the bad one comes with you.', 'bad', 2800);
+        return;
+      }
+      walkAway();
+    });
 
     PS.ui.append(rig, [
       h('div', { class: 'pz-scale-beam' }),
@@ -793,7 +812,7 @@
     /* Built once. The station hands these exact nodes back every time you come
        to the beam, so a half-loaded pair of pans survives walking off. */
     var panelStack = h('div', { class: 'pz-scale-rigcol' }, [
-      rig, handsCard, floorCard, howNote, buttonRow, rigCard, warnBox, logCard, callCard
+      rig, handsCard, floorCard, howNote, buttonRow, rigCard, warnBox, logCard, callCard, walkBtn
     ]);
 
     var arenaOk = false;
