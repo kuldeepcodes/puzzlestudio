@@ -456,6 +456,7 @@
     var arena = null;
     var exitStation = null;
     var props = {};                 // uid -> arena prop handle, for what is still on the floor
+    var commitBtn = null;           // the map-side "shoulder the pack"
     var nextSpot = 0;
 
     var floor = buildFloor(puzzle, skin.id);
@@ -710,9 +711,21 @@
       cRig.set(made + ' / ' + puzzle.combos.length);
     }
 
+    /* Shouldering the pack is the thing you came here to do, so it lives on
+       the map as well as in the panel — greyed out until you are at the door. */
+    function refreshFoot() {
+      if (!commitBtn) return;
+      var near = false;
+      if (arena) {
+        var p = arena.player();
+        near = Math.abs(p.tx - floor.exit.x) + Math.abs(p.ty - floor.exit.y) <= 1;
+      }
+      commitBtn.disabled = finished || puzzle.committed || !near;
+    }
+
     function paintAll() {
       syncFloor();
-      paintHold(); paintLash(); paintKnown(); paintFloorList(); paintHud();
+      paintHold(); paintLash(); paintKnown(); paintFloorList(); paintHud(); refreshFoot();
     }
 
     /* ------------------------------------------------------------ actions */
@@ -771,7 +784,7 @@
     function commit() {
       if (finished || puzzle.committed) return;
       puzzle.committed = true;
-      if (exitStation) exitStation.solve();
+      if (exitStation) { exitStation.solve(); exitStation.openNow(); }
       paintAll();
       PS.ui.clear(actions);
 
@@ -909,7 +922,8 @@
       map: { w: floor.w, h: floor.h, tiles: floor.tiles },
       spawn: floor.spawn,
       light: state.stats.light,
-      avatar: '\uD83E\uDDCD'
+      avatar: '\uD83E\uDDCD',
+      onStep: function () { refreshFoot(); }
     });
     if (!arena) return renderFlat();
     teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
@@ -919,6 +933,7 @@
     var cRig = arena.chip('Rigged', '\uD83D\uDD17');
 
     arena.note('Walk over a thing to shoulder it. What you can lift is what you leave with.');
+    commitBtn = arena.button('\uD83C\uDF92 Shoulder the pack', commit, 'pz-btn--primary');
     arena.button('\u21A9 Leave it all', abandon, 'pz-btn--danger');
 
     for (var i0 = 0; i0 < puzzle.items.length; i0++) {
