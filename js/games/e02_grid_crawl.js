@@ -220,53 +220,40 @@
     return 1;
   }
 
+  /**
+   * The same rule, continuous, for the arena's light mask. radiusFor() is the
+   * player-facing number; this is what the darkness actually does.
+   */
+  function arenaRadius(light) {
+    if (light <= 0) return 0.95;
+    if (light >= 70) return 3.6 + Math.min(30, light - 70) / 30 * 1.15;
+    if (light >= 38) return 2.6 + (light - 38) / 32;
+    return 1.25 + (light / 38) * 1.35;
+  }
+
   /* ================================================================ CSS == */
 
   var CSS = [
-    '.pz-crawl{display:grid;grid-template-columns:minmax(0,1fr) minmax(232px,300px);gap:18px;align-items:start}',
-    '@media (max-width:820px){.pz-crawl{grid-template-columns:1fr}}',
+    '.pz-crawl{display:flex;flex-direction:column;gap:12px}',
 
-    '.pz-crawl-board{display:grid;gap:3px;padding:12px;border-radius:12px;background:#05070a;',
-    '  border:1px solid var(--line);box-shadow:inset 0 0 70px rgba(0,0,0,.9);',
-    '  width:100%;max-width:560px;aspect-ratio:1/1;margin:0 auto}',
-    '.pz-crawl-cell{position:relative;display:grid;place-items:center;border-radius:4px;',
-    '  font-size:clamp(9px,2.1vw,17px);line-height:1;background:#080b10;color:var(--dimmer);',
-    '  border:1px solid transparent;transition:background .25s var(--ease),opacity .25s var(--ease),color .25s var(--ease)}',
-    '.pz-crawl-cell.is-unknown{background:#04060a;color:transparent}',
-    '.pz-crawl-cell.is-wall{background:#141922;border-color:#1c222c}',
-    '.pz-crawl-cell.is-wall.is-unknown{background:#05070b;border-color:transparent}',
-    '.pz-crawl-cell.is-mem{opacity:.42}',
-    '.pz-crawl-cell.is-lit{background:#101722;color:var(--text-2);',
-    '  box-shadow:0 0 12px color-mix(in srgb,var(--acc) 16%,transparent)}',
-    '.pz-crawl-cell.is-lit.is-wall{background:#1b222d}',
-    '.pz-crawl-cell.is-step{cursor:pointer;border-color:color-mix(in srgb,var(--acc) 55%,transparent)}',
-    '.pz-crawl-cell.is-step:hover{background:var(--acc-wash);transform:scale(1.06)}',
-    '.pz-crawl-cell.is-player{background:radial-gradient(circle,var(--acc-wash),transparent 72%);',
-    '  color:var(--text);box-shadow:0 0 22px var(--acc-glow);z-index:2}',
-    '.pz-crawl-cell.is-exit{color:var(--acc-2)}',
-    '.pz-crawl-cell.is-exit.is-lit{background:color-mix(in srgb,var(--acc) 22%,#101722)}',
+    '.pz-crawl-tips{display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:12px;color:var(--dim);line-height:1.6}',
+    '.pz-crawl-tips strong{color:var(--text-2);font-weight:600}',
+    '.pz-crawl-key{font-family:var(--font-mono);font-size:10.5px;padding:2px 7px;border-radius:5px;',
+    '  background:#0c1016;border:1px solid var(--line);border-bottom-width:2px;color:var(--text-2)}',
 
-    '.pz-crawl-dpad{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px);',
-    '  gap:6px;justify-content:center}',
-    '.pz-crawl-dpad button{border-radius:9px;border:1px solid var(--line);font-size:15px;',
-    '  background:linear-gradient(180deg,var(--panel-3),var(--panel-2));color:var(--text)}',
-    '.pz-crawl-dpad button:hover:not(:disabled){border-color:var(--acc)}',
-    '.pz-crawl-dpad button:disabled{opacity:.25}',
-    '.pz-crawl-dpad .sp{visibility:hidden}',
+    '.pz-crawl-legend{display:flex;flex-wrap:wrap;gap:11px;font-size:11px;color:var(--dim)}',
+    '.pz-crawl-legend span{display:inline-flex;gap:5px;align-items:center}',
 
-    '.pz-crawl-meter{display:flex;flex-direction:column;gap:6px}',
-    '.pz-crawl-meter__row{display:flex;justify-content:space-between;font-family:var(--font-mono);',
-    '  font-size:11px;color:var(--dim)}',
-    '.pz-crawl-meter__row b{color:var(--acc-2)}',
+    '.pz-crawl-read{display:flex;flex-direction:column;gap:6px}',
+    '.pz-crawl-read__row{display:flex;justify-content:space-between;gap:12px;',
+    '  font-family:var(--font-mono);font-size:11px;color:var(--dim)}',
+    '.pz-crawl-read__row b{color:var(--acc-2);font-weight:600}',
 
     '.pz-crawl-warn{font-size:12px;line-height:1.5;color:var(--bad);padding:9px 11px;border-radius:7px;',
     '  background:rgba(226,105,95,.08);border:1px solid rgba(226,105,95,.28)}',
 
-    '.pz-crawl-legend{display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--dim)}',
-    '.pz-crawl-legend span{display:inline-flex;gap:5px;align-items:center}',
-
-    '.pz-crawl-flash{animation:pzCrawlFlash .5s var(--ease)}',
-    '@keyframes pzCrawlFlash{0%{box-shadow:inset 0 0 0 rgba(0,0,0,0)}30%{box-shadow:inset 0 0 90px var(--acc-glow)}100%{box-shadow:inset 0 0 70px rgba(0,0,0,.9)}}'
+    '.pz-crawl-arrive{font-size:13px;line-height:1.65;color:var(--text-2);margin-bottom:12px}',
+    '.pz-crawl-arrive b{color:var(--acc-2)}'
   ].join('\n');
 
   /* ================================================================ MOUNT = */
@@ -277,185 +264,197 @@
     var h = PS.ui.h;
     var C = puzzle.content;
     var n = puzzle.n;
-    var cells = {};
     var finished = false;
+    var arena = null;
 
-    var board = h('div', {
-      class: 'pz-crawl-board',
-      style: { gridTemplateColumns: 'repeat(' + n + ', 1fr)', gridTemplateRows: 'repeat(' + n + ', 1fr)' }
+    var wrap = h('div', { class: 'pz-crawl' });
+    var stage = h('div', {});
+    var lastTone = null;
+    var tips = h('div', { class: 'pz-crawl-tips' }, [
+      h('span', {}, [
+        h('b', { class: 'pz-crawl-key', text: 'W A S D' }), ' / ',
+        h('b', { class: 'pz-crawl-key', text: '\u2190\u2191\u2193\u2192' }),
+        ' walk \u00B7 hold or click the ', h('strong', { text: 'mouse' }), ' to go there'
+      ]),
+      h('div', { class: 'pz-crawl-legend' }, [
+        h('span', {}, [C.fuelIcon, ' ' + C.fuelName]),
+        h('span', {}, [C.itemIcon, ' supplies']),
+        h('span', {}, [C.hazardIcon, ' ' + C.hazardName]),
+        h('span', {}, [C.exitIcon, ' way out'])
+      ])
+    ]);
+    PS.ui.append(wrap, [stage, tips]);
+    PS.ui.append(el, wrap);
+
+    /* ------------------------------------------------------- degraded mode -- */
+    /* arena.js is core and always present in index.html, but never let a
+       missing layer strand the player in an unfinishable scene.               */
+    if (!PS.arena || typeof PS.arena.create !== 'function') {
+      PS.ui.append(stage, h('div', { class: 'pz-intro', text: C.arrive }));
+      PS.ui.append(stage, h('div', { class: 'pz-choices' }, [
+        choiceBtn(C.down, 'descend'), choiceBtn(C.up, 'climb')
+      ]));
+      return;
+    }
+
+    /* -------------------------------------------------------------- arena -- */
+
+    arena = PS.arena.create(stage, {
+      map: { w: n, h: n, tiles: puzzle.grid },
+      spawn: { x: puzzle.x, y: puzzle.y },
+      avatar: C.playerIcon,
+      light: state.stats.light,
+      lightCurve: arenaRadius,
+      darkness: 0.965,
+      onStep: onStep
+    });
+    if (!arena) return;
+    teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
+
+    /* --------------------------------------------------------------- HUD --- */
+
+    var mLight = arena.meter('Light', '\uD83D\uDD26');
+    var cSight = arena.chip('Sight', '\uD83D\uDC41\uFE0F');
+    var cSteps = arena.chip('Steps', '\uD83D\uDC63');
+    var cCache = arena.chip('Caches', '\uD83D\uDCE6');
+
+    arena.note('The ' + C.fuelName + ' caches sit off the direct line \u2014 that is the whole decision.');
+    arena.button('\u21A9 Turn back', giveUp, 'pz-btn--danger');
+
+    /* ------------------------------------------------------------ features - */
+
+    for (var fy = 0; fy < n; fy++) {
+      for (var fx = 0; fx < n; fx++) {
+        var f = puzzle.features[key(fx, fy)];
+        if (!f || f.taken) continue;
+        addFeature(fx, fy, f);
+      }
+    }
+
+    function addFeature(fx, fy, f) {
+      if (f.kind === 'fuel') {
+        arena.prop({
+          x: fx, y: fy, icon: C.fuelIcon, label: C.fuelName, hint: 'walk onto it',
+          emits: 0.95, tint: '#f6d08a',
+          onActivate: function () { takeFuel(f); }
+        });
+      } else if (f.kind === 'item') {
+        arena.prop({
+          x: fx, y: fy, icon: C.itemIcon, label: PS.state.itemInfo(f.payload).name, hint: 'supplies',
+          emits: 0.7,
+          onActivate: function () { takeItem(f); }
+        });
+      } else {
+        arena.prop({
+          x: fx, y: fy, icon: C.hazardIcon, label: C.hazardName, hint: 'go around it',
+          emits: 0, glow: false, tint: '#e2695f', botSkip: true,
+          onActivate: function () { takeHazard(f); }
+        });
+      }
+    }
+
+    /* --------------------------------------------------------- the way out - */
+
+    var exitStation = arena.station({
+      x: puzzle.exit[0], y: puzzle.exit[1],
+      icon: C.exitIcon, label: 'The way out', hint: 'press E or walk in',
+      radius: 1.15, emits: 1.9,
+      onEnter: function (panel) {
+        PS.ui.append(panel, [
+          h('div', { class: 'pz-crawl-arrive' }, [
+            C.arrive + ' You made it in ',
+            h('b', { text: String(puzzle.moves) }),
+            ' steps; the shortest line was ',
+            h('b', { text: String(puzzle.optimal) }), '.'
+          ]),
+          h('div', { class: 'pz-choices' }, [
+            choiceBtn(C.down, 'descend'),
+            choiceBtn(C.up, 'climb')
+          ])
+        ]);
+      },
+      onOpen: function () {
+        if (puzzle.arrived || finished) return;
+        puzzle.arrived = true;
+        api.flash();
+        arena.ping(puzzle.exit[0], puzzle.exit[1]);
+      }
     });
 
-    for (var y = 0; y < n; y++) {
-      for (var x = 0; x < n; x++) {
-        (function (cx, cy) {
-          var c = h('div', { class: 'pz-crawl-cell' });
-          c.addEventListener('click', function () { tryStep(cx, cy); });
-          cells[key(cx, cy)] = c;
-          board.appendChild(c);
-        })(x, y);
-      }
-    }
+    /* -------------------------------------------------------------- steps -- */
 
-    /* ------------------------------------------------------------ readout -- */
-    var meter = h('div', { class: 'pz-crawl-meter' });
-    var warnBox = h('div', {});
-    var controls = h('div', { class: 'pz-col' });
-
-    function glyph(x, y) {
-      if (puzzle.x === x && puzzle.y === y) return C.playerIcon;
-      if (x === puzzle.exit[0] && y === puzzle.exit[1]) return C.exitIcon;
-      if (puzzle.grid[y][x] === 1) return '';
-      var f = puzzle.features[key(x, y)];
-      if (f && !f.taken) {
-        if (f.kind === 'fuel') return C.fuelIcon;
-        if (f.kind === 'item') return C.itemIcon;
-        if (f.kind === 'hazard') return C.hazardIcon;
-      }
-      return C.floor;
-    }
-
-    function paint() {
-      var r = radiusFor(state.stats.light);
-      for (var yy = 0; yy < n; yy++) {
-        for (var xx = 0; xx < n; xx++) {
-          var k = key(xx, yy);
-          var c = cells[k];
-          var d = Math.max(Math.abs(xx - puzzle.x), Math.abs(yy - puzzle.y));
-          var lit = d <= r;
-          var isPlayer = xx === puzzle.x && yy === puzzle.y;
-          if (lit || isPlayer) puzzle.seen[k] = true;
-
-          var known = !!puzzle.seen[k];
-          var cls = 'pz-crawl-cell';
-          if (puzzle.grid[yy][xx] === 1) cls += ' is-wall';
-          if (!known) cls += ' is-unknown';
-          else if (lit || isPlayer) cls += ' is-lit';
-          else cls += ' is-mem';
-          if (isPlayer) cls += ' is-player';
-          if (xx === puzzle.exit[0] && yy === puzzle.exit[1]) cls += ' is-exit';
-
-          var adjacent = (Math.abs(xx - puzzle.x) + Math.abs(yy - puzzle.y)) === 1;
-          if (!finished && adjacent && puzzle.grid[yy][xx] === 0) cls += ' is-step';
-
-          c.className = cls;
-          c.textContent = known ? glyph(xx, yy) : '';
-        }
-      }
-      paintMeter();
-    }
-
-    function paintMeter() {
-      PS.ui.clear(meter);
-      var r = radiusFor(state.stats.light);
-      PS.ui.append(meter, [
-        row('Light', state.stats.light + ' / 100'),
-        row('Sight radius', r === 0 ? 'blind' : r + ' cell' + (r === 1 ? '' : 's')),
-        row('Cost per step', state.stats.light > 0 ? '\uD83D\uDD26 ' + puzzle.drain : '\u2764\uFE0F ' + puzzle.blindCost),
-        row('Steps taken', String(puzzle.moves)),
-        row('Best possible', puzzle.optimal + ' steps'),
-        row('Caches found', String(puzzle.pickups))
-      ]);
-      PS.ui.clear(warnBox);
-      if (state.stats.light <= 0) {
-        warnBox.appendChild(h('div', { class: 'pz-crawl-warn' },
-          ['Your light is dead. You are feeling along the wall now, and every step costs blood.']));
-      } else if (state.stats.light < puzzle.drain * 4) {
-        warnBox.appendChild(h('div', { class: 'pz-crawl-warn' },
-          ['Four steps of light left. Find a ' + C.fuelName + ' or commit to the dark.']));
-      }
-      function row(k, v) {
-        return h('div', { class: 'pz-crawl-meter__row' }, [h('span', { text: k }), h('b', { text: v })]);
-      }
-    }
-
-    /* ------------------------------------------------------------- moving -- */
-
-    function tryStep(x, y) {
-      if (finished || puzzle.arrived) return;
-      if (Math.abs(x - puzzle.x) + Math.abs(y - puzzle.y) !== 1) return;
-      if (x < 0 || y < 0 || x >= n || y >= n) return;
-      if (puzzle.grid[y][x] === 1) { api.toast('Blocked.', 'bad', 1100); return; }
-      step(x, y);
-    }
-
-    function step(x, y) {
+    function onStep(x, y) {
+      if (finished) return;
       puzzle.x = x; puzzle.y = y; puzzle.moves++;
+      puzzle.seen[key(x, y)] = true;
 
       if (state.stats.light > 0) api.tweak({ light: -puzzle.drain, energy: -1 });
       else api.tweak({ health: -puzzle.blindCost, energy: -1, morale: -1 });
 
-      var f = puzzle.features[key(x, y)];
-      if (f && !f.taken) {
-        f.taken = true;
-        if (f.kind === 'fuel') {
-          puzzle.pickups++;
-          api.tweak({ light: f.payload, morale: 3 });
-          api.toast(C.fuelLine, 'good');
-          board.classList.remove('pz-crawl-flash'); void board.offsetWidth; board.classList.add('pz-crawl-flash');
-        } else if (f.kind === 'item') {
-          puzzle.pickups++;
-          puzzle.itemsTaken.push(f.payload);
-          api.tweak(null, [f.payload]);
-          api.toast('You take the ' + PS.state.itemInfo(f.payload).name.toLowerCase() + '.', 'good');
-        } else if (f.kind === 'hazard') {
-          puzzle.hazardsHit++;
-          api.tweak({ health: -f.payload, energy: -3 });
-          api.toast(C.hazardLine, 'bad');
+      syncLight();
+      paintReadout();
+    }
+
+    function takeFuel(f) {
+      if (f.taken || finished) return;
+      f.taken = true;
+      puzzle.pickups++;
+      api.tweak({ light: f.payload, morale: 3 });
+      api.toast(C.fuelLine, 'good');
+      syncLight();
+      arena.ping(puzzle.x, puzzle.y, '#f6d08a');
+      paintReadout();
+    }
+
+    function takeItem(f) {
+      if (f.taken || finished) return;
+      f.taken = true;
+      puzzle.pickups++;
+      puzzle.itemsTaken.push(f.payload);
+      api.tweak(null, [f.payload]);
+      api.toast('You take the ' + PS.state.itemInfo(f.payload).name.toLowerCase() + '.', 'good');
+      paintReadout();
+    }
+
+    function takeHazard(f) {
+      if (f.taken || finished) return;
+      f.taken = true;
+      puzzle.hazardsHit++;
+      api.tweak({ health: -f.payload, energy: -3 });
+      api.toast(C.hazardLine, 'bad');
+      arena.hit('#e2695f');
+      arena.dust(puzzle.x, puzzle.y, 10, '#e2695f');
+      paintReadout();
+    }
+
+    function syncLight() {
+      if (arena) arena.setLight(state.stats.light);
+    }
+
+    /* ------------------------------------------------------------ readout -- */
+
+    function paintReadout() {
+      if (!arena || finished) return;
+      var lv = state.stats.light;
+      var r = radiusFor(lv);
+      var tone = lv <= 0 ? 'bad' : (lv < puzzle.drain * 4 ? 'warn' : null);
+
+      mLight.set(lv, lv + ' / 100', tone);
+      cSight.set(r === 0 ? 'blind' : r + ' cell' + (r === 1 ? '' : 's'), tone);
+      cSteps.set(puzzle.moves + ' / ' + puzzle.optimal + ' best');
+      cCache.set(String(puzzle.pickups));
+
+      if (tone !== lastTone) {
+        var first = lastTone === null;
+        lastTone = tone;
+        if (!first || tone) {
+          if (tone === 'bad') api.toast('Your light is dead. You are feeling along the wall now, and every step costs blood.', 'bad', 4600);
+          else if (tone === 'warn') api.toast('Four steps of light left. Find a ' + C.fuelName + ' or commit to the dark.', 'bad', 4600);
         }
       }
-
-      if (x === puzzle.exit[0] && y === puzzle.exit[1]) {
-        puzzle.arrived = true;
-        paint();
-        renderExitChoice();
-        return;
-      }
-      paint();
-    }
-
-    function onKey(ev) {
-      var map = {
-        ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
-        w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
-        W: [0, -1], S: [0, 1], A: [-1, 0], D: [1, 0]
-      };
-      var m = map[ev.key];
-      if (!m) return;
-      ev.preventDefault();
-      tryStep(puzzle.x + m[0], puzzle.y + m[1]);
-    }
-    document.addEventListener('keydown', onKey);
-    teardownFns.push(function () { document.removeEventListener('keydown', onKey); });
-
-    /* -------------------------------------------------------------- d-pad -- */
-    var dpadBtns = {};
-    function dpad() {
-      function b(dx, dy, label) {
-        var btn = h('button', { type: 'button', text: label });
-        btn.addEventListener('click', function () { tryStep(puzzle.x + dx, puzzle.y + dy); });
-        dpadBtns[dx + ':' + dy] = btn;
-        return btn;
-      }
-      return h('div', { class: 'pz-crawl-dpad' }, [
-        h('div', { class: 'sp' }), b(0, -1, '\u25B2'), h('div', { class: 'sp' }),
-        b(-1, 0, '\u25C0'), h('div', { class: 'sp' }), b(1, 0, '\u25B6'),
-        h('div', { class: 'sp' }), b(0, 1, '\u25BC'), h('div', { class: 'sp' })
-      ]);
     }
 
     /* ------------------------------------------------------------ endings -- */
-
-    function renderExitChoice() {
-      PS.ui.clear(controls);
-      PS.ui.append(controls, [
-        h('div', { class: 'pz-intro', text: C.arrive + ' You made it in ' + puzzle.moves + ' steps; the shortest line was ' + puzzle.optimal + '.' }),
-        h('div', { class: 'pz-choices' }, [
-          choiceBtn(C.down, 'descend'),
-          choiceBtn(C.up, 'climb')
-        ])
-      ]);
-      api.flash();
-    }
 
     function choiceBtn(spec, id) {
       return h('button', {
@@ -471,6 +470,7 @@
     function finishRun(choice) {
       if (finished) return;
       finished = true;
+      if (exitStation) exitStation.solve();
       var blind = state.stats.light <= 0;
       var efficient = puzzle.moves <= Math.ceil(puzzle.optimal * 1.25);
       var thorough = puzzle.pickups >= 2;
@@ -508,43 +508,8 @@
       });
     }
 
-    /* ------------------------------------------------------------- layout -- */
-    PS.ui.append(controls, [
-      dpad(),
-      h('div', { class: 'pz-crawl-legend' }, [
-        h('span', {}, [C.fuelIcon, ' ' + C.fuelName]),
-        h('span', {}, [C.itemIcon, ' supplies']),
-        h('span', {}, [C.hazardIcon, ' ' + C.hazardName]),
-        h('span', {}, [C.exitIcon, ' way out'])
-      ]),
-      h('button', {
-        class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button',
-        onclick: giveUp
-      }, ['\u21A9 Turn back'])
-    ]);
-
-    PS.ui.append(el, h('div', { class: 'pz-crawl' }, [
-      h('div', { class: 'pz-col' }, [
-        board,
-        h('div', { class: 'pz-note' }, [
-          'Arrow keys, WASD, or click a neighbouring cell. Fuel caches sit ',
-          h('strong', { text: 'off' }), ' the direct line \u2014 that is the whole decision.'
-        ])
-      ]),
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'Position' }),
-          meter
-        ]),
-        warnBox,
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'Move' }),
-          controls
-        ])
-      ])
-    ]));
-
-    paint();
+    paintReadout();
+    arena.focus();
   }
 
   function unmount() {
