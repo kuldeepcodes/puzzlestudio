@@ -213,6 +213,12 @@
       try { scene.engine.unmount(); }
       catch (e) { if (root.console) console.warn('[PuzzleStudio] unmount() threw in "' + scene.engine.id + '":', e); }
     }
+    // Safety net: an arena that outlived its scene would keep an rAF loop and a
+    // keyboard listener alive on top of the next one. Never allow it.
+    if (PS.arena && PS.arena.active()) {
+      try { PS.arena.destroyActive(); }
+      catch (e2) { if (root.console) console.warn('[PuzzleStudio] arena destroy threw:', e2); }
+    }
     PS.ui.setHintHandler(null);
     scene = null;
   }
