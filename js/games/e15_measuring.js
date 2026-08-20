@@ -24,6 +24,14 @@
                 is, FILL and EMPTY do not exist, and you can only pour between
                 them. That is a genuinely different and much nastier puzzle.
 
+   THE ROOM (arena)
+     The vessels are objects standing on the floor of a room, not widgets in a
+     row. You pick one up, you carry it to the tap to fill it, to the drain to
+     tip it out, or to another vessel to pour. Every move in the BFS is a walk
+     across the room with something heavy in your hands, which is what the jug
+     problem always was. The bench at the end of the room is the station: it
+     keeps the count, the take-backs and, once it is measured, the choice.
+
    THE BRANCH
      Having measured it out, you either stay and draw off everything you can
      carry, or you take the one exact measure and move while you still can.
@@ -41,6 +49,8 @@
       unit: 'L',
       source: 'the bowser',
       sourceIcon: '\u26FD',
+      drain: 'the floor drain',
+      drainIcon: '\uD83D\uDD73\uFE0F',
       vessels: ['Drum', 'Jerrycan', 'Measure'],
       icons: ['\uD83D\uDEE2\uFE0F', '\u26FD', '\uD83E\uDD5B'],
       substance: 'mix',
@@ -61,6 +71,8 @@
       unit: 'ml',
       source: 'the saline drum',
       sourceIcon: '\uD83D\uDCA7',
+      drain: 'the sluice',
+      drainIcon: '\uD83D\uDD73\uFE0F',
       vessels: ['Flask', 'Beaker', 'Vial'],
       icons: ['\u2697\uFE0F', '\uD83E\uDDEA', '\uD83D\uDC8A'],
       substance: 'dilution',
@@ -81,6 +93,8 @@
       unit: 'L',
       source: 'the melt tank',
       sourceIcon: '\uD83D\uDCA7',
+      drain: 'the snow outside',
+      drainIcon: '\u2744\uFE0F',
       vessels: ['Billy', 'Canteen', 'Cup'],
       icons: ['\uD83E\uDEA3', '\uD83C\uDF76', '\u2615'],
       substance: 'water',
@@ -381,20 +395,19 @@
   var CSS = [
     '.pz-measure{display:grid;grid-template-columns:minmax(0,1fr) minmax(228px,286px);gap:18px;align-items:start}',
     '@media (max-width:860px){.pz-measure{grid-template-columns:1fr}}',
+    '.pz-measure.is-panel{display:flex;flex-direction:column;gap:12px}',
+    '.pz-measure-stage{display:flex;flex-direction:column;gap:14px}',
 
     '.pz-measure-bench{display:flex;gap:16px;justify-content:center;align-items:flex-end;flex-wrap:wrap;',
     '  padding:20px 16px 16px;border-radius:12px;border:1px solid var(--line);',
     '  background:radial-gradient(120% 90% at 50% 0%,rgba(255,255,255,.035),transparent 70%),#0a0d13}',
+    '.pz-measure.is-panel .pz-measure-bench{gap:10px;padding:14px 8px 10px}',
 
     '.pz-measure-vessel{display:flex;flex-direction:column;align-items:center;gap:8px;padding:9px 10px 11px;',
-    '  border-radius:11px;border:1px solid transparent;cursor:pointer;transition:border-color .2s var(--ease),',
+    '  border-radius:11px;border:1px solid transparent;transition:border-color .2s var(--ease),',
     '  background .2s var(--ease),transform .2s var(--ease)}',
-    '.pz-measure-vessel:hover{background:rgba(255,255,255,.03);border-color:var(--line)}',
     '.pz-measure-vessel.is-src{border-color:var(--acc);background:var(--acc-wash);transform:translateY(-3px)}',
-    '.pz-measure-vessel.is-drop{border-color:var(--good);background:rgba(95,207,141,.09)}',
     '.pz-measure-vessel.is-hit .pz-measure-tube{box-shadow:0 0 0 2px var(--good),0 0 26px rgba(95,207,141,.4)}',
-    '.pz-measure-vessel.is-locked{cursor:default}',
-    '.pz-measure-vessel.is-locked:hover{background:none;border-color:transparent}',
 
     '.pz-measure-head{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2)}',
     '.pz-measure-head b{font-family:var(--font-mono);color:var(--acc-2);font-weight:700}',
@@ -424,6 +437,7 @@
     '  font-family:var(--font-ui)}',
     '.pz-measure-acts button:hover:not(:disabled){border-color:var(--acc);color:var(--text)}',
     '.pz-measure-acts button:disabled{opacity:.25;cursor:default}',
+    '.pz-measure-hand{font-family:var(--font-mono);font-size:10px;color:var(--acc-2);min-height:12px}',
 
     '.pz-measure-src{display:flex;align-items:center;gap:8px;justify-content:center;font-size:12px;',
     '  color:var(--dim);padding-top:2px}',
@@ -445,6 +459,38 @@
     '.pz-measure-warn.is-bad{color:var(--bad);background:rgba(226,105,95,.08);border-color:rgba(226,105,95,.28)}'
   ].join('\n');
 
+  /* ================================================================ ROOM == */
+  /* The vessels are objects on the floor. You carry one to the tap, to the
+     drain, or to another vessel — every BFS move is a walk with something
+     heavy in your hands.
+       #  wall   .  floor   1-3 vessels   T tap   X drain   S bench   @ start */
+
+  var ROOM = [
+    '###############',
+    '#.....T.......#',
+    '#.............#',
+    '#...1.....2...#',
+    '#.............#',
+    '#.X...@......S#',
+    '#.............#',
+    '#......3......#',
+    '###############'
+  ];
+
+  function readRoom(rows) {
+    var tiles = [], spots = {}, y, x, ch;
+    for (y = 0; y < rows.length; y++) {
+      var line = [];
+      for (x = 0; x < rows[y].length; x++) {
+        ch = rows[y].charAt(x);
+        line.push(ch === '#' ? 1 : 0);
+        if (ch !== '#' && ch !== '.') spots[ch] = { x: x, y: y };
+      }
+      tiles.push(line);
+    }
+    return { w: rows[0].length, h: rows.length, tiles: tiles, spots: spots };
+  }
+
   /* ================================================================ MOUNT = */
 
   var teardownFns = [];
@@ -455,20 +501,33 @@
     var n = puzzle.caps.length;
     var maxCap = Math.max.apply(null, puzzle.caps);
     var finished = false;
-    var src = -1;                 // index of the vessel selected as pour source
+    var carry = -1;               // index of the vessel in your hands, or -1
+    var arena = null;
 
-    var vessels = [];             // [{ root, fluid, amt, fillBtn, emptyBtn }]
+    var vessels = [];             // [{ root, fluid, amt }]
+    var handles = [];             // arena prop handles, one per vessel
+    var chips = [];
+    var cMoves = null;
+    var noteEl = null;
+
+    var stage = h('div', { class: 'pz-measure-stage' });
+    var mapHost = h('div', {});
+    var endBox = h('div', {});
     var bench = h('div', { class: 'pz-measure-bench' });
     var rows = h('div', { class: 'pz-measure-rows' });
     var logBox = h('div', { class: 'pz-measure-log' });
     var warnBox = h('div', {});
     var controls = h('div', { class: 'pz-col' });
+    var panelRoot = h('div', { class: 'pz-measure' });
+    var handLine = h('div', { class: 'pz-measure-hand' });
 
     /* ------------------------------------------------------------ vessels -- */
+    /* The tubes are the readout now: they show every level and the target line
+       at a glance. The doing happens in the room.                            */
 
     function buildVessel(i) {
       var cap = puzzle.caps[i];
-      var tubeH = 78 + Math.round((cap / maxCap) * 96);
+      var tubeH = 62 + Math.round((cap / maxCap) * 74);
 
       var fluid = h('div', { class: 'pz-measure-fluid' });
       var tube = h('div', { class: 'pz-measure-tube', style: { height: tubeH + 'px' } }, [
@@ -495,69 +554,167 @@
         h('span', { text: '0' }), h('small', { text: C.unit })
       ]);
 
-      var fillBtn = null, emptyBtn = null, acts = null;
-      if (!puzzle.sealed) {
-        fillBtn = h('button', {
-          type: 'button', 'data-act': 'fill:' + i, title: C.fillVerb + ' ' + LETTERS[i] + ' from ' + C.source,
-          onclick: function (ev) { ev.stopPropagation(); doMove({ kind: 'fill', i: i }); }
-        }, [C.fillVerb]);
-        emptyBtn = h('button', {
-          type: 'button', 'data-act': 'empty:' + i, title: C.emptyVerb + ' ' + LETTERS[i],
-          onclick: function (ev) { ev.stopPropagation(); doMove({ kind: 'empty', i: i }); }
-        }, [C.emptyVerb]);
-        acts = h('div', { class: 'pz-measure-acts' }, [fillBtn, emptyBtn]);
-      }
-
-      var rootEl = h('div', {
-        class: 'pz-measure-vessel', 'data-act': 'vessel:' + i,
-        onclick: function () { tapVessel(i); }
-      }, [
+      var rootEl = h('div', { class: 'pz-measure-vessel' }, [
         h('div', { class: 'pz-measure-head' }, [
           h('span', { text: C.icons[i] || '\uD83E\uDDF4' }),
           h('b', { text: LETTERS[i] }),
           h('span', { text: C.vessels[i] || 'Vessel' })
         ]),
-        tube, amt, acts
+        tube, amt
       ]);
 
-      vessels.push({ root: rootEl, fluid: fluid, amt: amt.childNodes[0], fillBtn: fillBtn, emptyBtn: emptyBtn });
+      vessels.push({ root: rootEl, fluid: fluid, amt: amt.childNodes[0] });
       return rootEl;
     }
 
     for (var vi = 0; vi < n; vi++) bench.appendChild(buildVessel(vi));
 
+    /* --------------------------------------------------------------- room -- */
+
+    function buildRoom() {
+      if (!PS.arena || typeof PS.arena.create !== 'function') return false;
+
+      var room = readRoom(ROOM);
+      var spawn = room.spots['@'] || { x: 1, y: 1 };
+
+      arena = PS.arena.create(mapHost, {
+        map: { w: room.w, h: room.h, tiles: room.tiles },
+        spawn: spawn,
+        avatar: '\uD83E\uDDCD',
+        light: state.stats.light,
+        lightCurve: function (v) { return 4.8 + Math.min(100, Math.max(0, v)) / 100 * 2.6; },
+        darkness: 0.5,
+        memory: 0.72,
+        compact: true
+      });
+      if (!arena) return false;
+      teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
+      arena.revealAll();
+
+      arena.chip('Target', '\uD83C\uDFAF').set(puzzle.target + ' ' + C.unit);
+      for (var i = 0; i < n; i++) {
+        chips.push(arena.chip(LETTERS[i] + ' \u00B7 ' + (C.vessels[i] || 'Vessel'), C.icons[i] || '\uD83E\uDDF4'));
+      }
+      cMoves = arena.chip('Moves', '\uD83D\uDC63');
+
+      for (i = 0; i < n; i++) {
+        (function (idx) {
+          var spot = room.spots[String(idx + 1)];
+          // Push either way, so handles stay index-aligned with the vessels
+          // however many capacities the tier deals out.
+          if (!spot) { handles.push(null); return; }
+          handles.push(arena.prop({
+            x: spot.x, y: spot.y, icon: C.icons[idx] || '\uD83E\uDDF4',
+            label: LETTERS[idx], hint: 'walk onto it',
+            // proximity, not step: a step prop only ever fires once, and this
+            // is a thing you come back to again and again.
+            trigger: 'proximity', radius: 0.8, once: false, emits: 0.8,
+            onActivate: function () { touchVessel(idx); }
+          }));
+        })(i);
+      }
+
+      var tap = room.spots.T, drain = room.spots.X;
+      if (tap) {
+        arena.prop({
+          x: tap.x, y: tap.y, icon: C.sourceIcon, label: C.source,
+          hint: puzzle.sealed ? 'dry' : 'fill what you are carrying',
+          trigger: 'proximity', radius: 0.8, once: false,
+          emits: puzzle.sealed ? 0.35 : 1.1, botSkip: puzzle.sealed,
+          onActivate: function () { atSource(); }
+        });
+      }
+      if (drain) {
+        arena.prop({
+          x: drain.x, y: drain.y, icon: C.drainIcon || '\uD83D\uDD73\uFE0F', label: C.drain || 'the drain',
+          hint: puzzle.sealed ? 'no use to you now' : 'tip it out here',
+          trigger: 'proximity', radius: 0.8, once: false, emits: 0.3,
+          glow: !puzzle.sealed, botSkip: true,
+          onActivate: function () { atDrain(); }
+        });
+      }
+
+      var seat = room.spots.S;
+      if (seat) {
+        arena.station({
+          x: seat.x, y: seat.y, icon: '\uD83E\uDDEA', label: 'The bench',
+          hint: 'read the levels', radius: 1.4, emits: 1.8,
+          onEnter: function (panelEl) { PS.ui.append(panelEl, panelRoot); }
+        });
+      }
+
+      noteEl = arena.note(puzzle.sealed
+        ? C.sealed + ' Walk onto a vessel to pick it up, then onto another to pour.'
+        : 'Walk onto a vessel to pick it up. Carry it to ' + C.source + ' to fill it, to ' +
+          (C.drain || 'the drain') + ' to tip it out, or onto another vessel to pour.');
+      arena.button('\u21B6 Take it back', undo, 'pz-btn--sm');
+      arena.button('\u270B Set it down', setDown, 'pz-btn--sm');
+      arena.button('\u21A9 Guess it instead', walkAway, 'pz-btn--danger');
+      return true;
+    }
+
     /* ------------------------------------------------------------ actions -- */
 
-    function tapVessel(i) {
+    function setDown() {
+      if (carry < 0 || finished) return;
+      api.toast('You set ' + LETTERS[carry] + ' back down.', 'info', 1400);
+      carry = -1;
+      paint();
+    }
+
+    function touchVessel(i) {
       if (finished || puzzle.solved) return;
-      if (src === -1) {
-        if (puzzle.levels[i] <= 0) { api.toast(LETTERS[i] + ' is empty \u2014 nothing to pour.', 'bad'); return; }
-        src = i; paint();
+      if (carry < 0) {
+        carry = i;
+        api.toast('You pick up ' + LETTERS[i] + ' \u2014 ' + (C.vessels[i] || 'the vessel').toLowerCase() +
+          ', ' + puzzle.levels[i] + ' ' + C.unit + ' in it.', 'info', 1800);
+        paint();
         return;
       }
-      if (src === i) { src = -1; paint(); return; }
+      if (carry === i) { setDown(); return; }
+      if (puzzle.levels[carry] <= 0) { api.toast(LETTERS[carry] + ' is empty \u2014 nothing to pour.', 'bad'); return; }
       if (puzzle.levels[i] >= puzzle.caps[i]) { api.toast(LETTERS[i] + ' is already full.', 'bad'); return; }
-      var from = src; src = -1;
-      doMove({ kind: 'pour', i: from, j: i });
+      doMove({ kind: 'pour', i: carry, j: i });
+    }
+
+    function atSource() {
+      if (finished || puzzle.solved) return;
+      if (puzzle.sealed) { api.toast(C.sealed, 'bad', 3000); return; }
+      if (carry < 0) { api.toast('You have nothing in your hands to fill.', 'bad'); return; }
+      if (puzzle.levels[carry] >= puzzle.caps[carry]) { api.toast(LETTERS[carry] + ' is already full.', 'bad'); return; }
+      doMove({ kind: 'fill', i: carry });
+    }
+
+    function atDrain() {
+      if (finished || puzzle.solved) return;
+      if (puzzle.sealed) { api.toast('Nothing is going down there tonight. Every drop stays in the set.', 'bad', 2600); return; }
+      if (carry < 0) { api.toast('You have nothing in your hands to tip out.', 'bad'); return; }
+      if (puzzle.levels[carry] <= 0) { api.toast(LETTERS[carry] + ' is already empty.', 'bad'); return; }
+      doMove({ kind: 'empty', i: carry });
     }
 
     function doMove(mv) {
       if (finished || puzzle.solved) return;
-      if (mv.kind === 'fill' && puzzle.levels[mv.i] >= puzzle.caps[mv.i]) { api.toast(LETTERS[mv.i] + ' is already full.', 'bad'); return; }
-      if (mv.kind === 'empty' && puzzle.levels[mv.i] <= 0) { api.toast(LETTERS[mv.i] + ' is already empty.', 'bad'); return; }
+      if (mv.kind === 'fill' && puzzle.levels[mv.i] >= puzzle.caps[mv.i]) return;
+      if (mv.kind === 'empty' && puzzle.levels[mv.i] <= 0) return;
       if (mv.kind === 'pour' && (puzzle.levels[mv.i] <= 0 || puzzle.levels[mv.j] >= puzzle.caps[mv.j])) return;
 
-      puzzle.history.push({ levels: puzzle.levels.slice(), wasted: puzzle.wasted, moves: puzzle.moves });
+      puzzle.history.push({ levels: puzzle.levels.slice(), wasted: puzzle.wasted, moves: puzzle.moves, carry: carry });
       applyMove(puzzle, mv);
       puzzle.moves++;
       puzzle.log.push(moveLabel(puzzle, mv));
       if (puzzle.log.length > 40) puzzle.log.shift();
-      src = -1;
 
       if (mv.kind === 'fill') api.toast(C.fillLine, 'info');
       else if (mv.kind === 'empty') api.toast(C.emptyLine, 'bad');
+      else api.toast(C.pourLine, 'info', 1600);
 
-      if (hitTarget(puzzle)) { puzzle.solved = true; paint(); succeed(); return; }
+      if (arena) {
+        var p = arena.player();
+        arena.dust(p.tx, p.ty, 8, mv.kind === 'empty' ? '#e2695f' : null);
+      }
+
+      if (hitTarget(puzzle)) { puzzle.solved = true; carry = -1; paint(); succeed(); return; }
       if (puzzle.moves >= puzzle.moveLimit) { paint(); ranOut(); return; }
       paint();
     }
@@ -570,9 +727,9 @@
       puzzle.levels = prev.levels;
       puzzle.wasted = prev.wasted;
       puzzle.moves = prev.moves;
+      carry = prev.carry === undefined ? -1 : prev.carry;
       puzzle.undosLeft--;
       puzzle.log.pop();
-      src = -1;
       paint();
     }
 
@@ -583,17 +740,31 @@
         var v = vessels[i];
         var lvl = puzzle.levels[i];
         var cls = 'pz-measure-vessel';
-        if (finished || puzzle.solved) cls += ' is-locked';
-        else if (src === i) cls += ' is-src';
-        else if (src !== -1 && lvl < puzzle.caps[i]) cls += ' is-drop';
+        if (carry === i) cls += ' is-src';
         if (lvl === puzzle.target) cls += ' is-hit';
         v.root.className = cls;
         v.fluid.style.height = ((lvl / puzzle.caps[i]) * 100) + '%';
         v.amt.textContent = String(lvl);
-        var lock = finished || puzzle.solved;
-        if (v.fillBtn) v.fillBtn.disabled = lock || lvl >= puzzle.caps[i];
-        if (v.emptyBtn) v.emptyBtn.disabled = lock || lvl <= 0;
+
+        if (chips[i]) chips[i].set(lvl + ' / ' + puzzle.caps[i], lvl === puzzle.target ? 'warn' : null);
+        if (handles[i]) {
+          handles[i].setLabel(LETTERS[i] + ' \u00B7 ' + (C.vessels[i] || 'Vessel') + ' \u2014 ' +
+            lvl + '/' + puzzle.caps[i] + ' ' + C.unit +
+            (carry === i ? ' (in your hands)' : (carry >= 0 ? ' (pour ' + LETTERS[carry] + ' in)' : '')));
+        }
       }
+
+      if (arena) arena.setAvatar(carry >= 0 ? (C.icons[carry] || '\uD83E\uDDF4') : '\uD83E\uDDCD');
+      if (cMoves) {
+        var left = puzzle.moveLimit - puzzle.moves;
+        cMoves.set(puzzle.moves + ' \u00B7 ' + left + ' left', left <= 4 ? 'bad' : null);
+      }
+
+      PS.ui.clear(handLine);
+      PS.ui.append(handLine, [carry >= 0
+        ? 'In your hands: ' + LETTERS[carry] + ' \u2014 ' + puzzle.levels[carry] + ' ' + C.unit
+        : 'Both hands empty.']);
+
       paintRows();
       paintLog();
       paintWarn();
@@ -638,9 +809,9 @@
       if (left <= 3) {
         warnBox.appendChild(h('div', { class: 'pz-measure-warn is-bad', text:
           'You are nearly out of patience and out of ' + C.substance + '. ' + left + ' more moves and you are working with what you have.' }));
-      } else if (src !== -1) {
+      } else if (carry >= 0) {
         warnBox.appendChild(h('div', { class: 'pz-measure-warn', text:
-          LETTERS[src] + ' is in your hands. Tap another vessel to pour into it, or tap ' + LETTERS[src] + ' again to set it down.' }));
+          LETTERS[carry] + ' is in your hands. Walk it onto another vessel to pour, or set it down.' }));
       } else if (puzzle.moves > puzzle.par) {
         warnBox.appendChild(h('div', { class: 'pz-measure-warn', text:
           'Past par. It is still solvable from here \u2014 it is always solvable from here \u2014 but it will not be pretty.' }));
@@ -650,9 +821,14 @@
     /* ------------------------------------------------------------ endings -- */
 
     function succeed() {
-      PS.ui.clear(controls);
       var clean = puzzle.moves <= puzzle.par;
-      PS.ui.append(controls, [
+      if (arena) {
+        if (noteEl) noteEl.textContent = C.solve.replace('%T%', String(puzzle.target));
+        var p = arena.player();
+        arena.ping(p.tx, p.ty, '#5fcf8d');
+      }
+      PS.ui.clear(endBox);
+      PS.ui.append(endBox, [
         h('div', { class: 'pz-intro', text:
           C.solve.replace('%T%', String(puzzle.target)) + ' ' +
           (clean
@@ -745,19 +921,6 @@
 
     /* ------------------------------------------------------------- layout -- */
 
-    PS.ui.append(controls, [
-      h('div', { class: 'pz-row' }, [
-        h('button', {
-          class: 'pz-btn pz-btn--sm', type: 'button', 'data-act': 'undo',
-          onclick: undo
-        }, ['\u21B6 Take it back']),
-        h('button', {
-          class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button', 'data-act': 'walk',
-          onclick: walkAway
-        }, ['\u21A9 Guess it instead'])
-      ])
-    ]);
-
     var sourceLine = puzzle.sealed
       ? h('div', { class: 'pz-measure-src' }, [h('span', { text: '\uD83D\uDEAB' }), h('b', { text: C.sealed })])
       : h('div', { class: 'pz-measure-src' }, [
@@ -765,18 +928,12 @@
           'Unlimited from ', h('b', { text: C.source }), ' \u2014 the problem is not supply, it is the markings.'
         ]);
 
-    PS.ui.append(el, h('div', { class: 'pz-measure' }, [
+    PS.ui.append(panelRoot, [
       h('div', { class: 'pz-col' }, [
         h('div', { class: 'pz-intro', text: C.goal.replace('%T%', String(puzzle.target)) }),
         bench,
-        sourceLine,
-        h('div', { class: 'pz-note' }, [
-          'Tap a vessel to pick it up, then tap another to ',
-          h('strong', { text: 'pour' }),
-          ' until one empties or the other fills.',
-          puzzle.sealed ? ' There is no tap and no drain: every drop stays in the set.'
-                        : ' Use the small buttons to fill from the source or tip one out.'
-        ])
+        handLine,
+        sourceLine
       ]),
       h('div', { class: 'pz-col' }, [
         h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'Measure' }), rows]),
@@ -784,11 +941,40 @@
         h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'What you did' }), logBox]),
         h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'Bench' }), controls])
       ])
-    ]));
+    ]);
+
+    PS.ui.append(stage, [mapHost, endBox]);
+    PS.ui.append(el, stage);
+
+    if (buildRoom()) {
+      panelRoot.className = 'pz-measure is-panel';
+      PS.ui.append(controls, h('div', { class: 'pz-note', text:
+        'The vessels are on the floor of the room, not on this bench. Walk onto one to pick it up.' }));
+    } else {
+      // No arena layer: fall back to buttons on the bench so the scene is
+      // always finishable.
+      for (var q = 0; q < n; q++) {
+        (function (idx) {
+          var acts = h('div', { class: 'pz-measure-acts' }, [
+            h('button', { type: 'button', onclick: function () { touchVessel(idx); } }, ['Take / pour']),
+            puzzle.sealed ? null : h('button', { type: 'button', onclick: function () { carry = idx; atSource(); } }, [C.fillVerb]),
+            puzzle.sealed ? null : h('button', { type: 'button', onclick: function () { carry = idx; atDrain(); } }, [C.emptyVerb])
+          ]);
+          vessels[idx].root.appendChild(acts);
+        })(q);
+      }
+      PS.ui.append(controls, [
+        h('div', { class: 'pz-row' }, [
+          h('button', { class: 'pz-btn pz-btn--sm', type: 'button', 'data-act': 'undo', onclick: undo }, ['\u21B6 Take it back']),
+          h('button', { class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button', 'data-act': 'walk', onclick: walkAway }, ['\u21A9 Guess it instead'])
+        ])
+      ]);
+      PS.ui.append(mapHost, panelRoot);
+    }
 
     paint();
+    if (arena) arena.focus();
   }
-
   function unmount() {
     while (teardownFns.length) {
       try { teardownFns.pop()(); } catch (e) { /* keep unwinding */ }

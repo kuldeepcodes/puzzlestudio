@@ -12,12 +12,25 @@
 
      There is a row on the sheet for you. You have not eaten either.
 
+   THE ROOM (arena)
+     They are not rows in a table. They are people standing around a room, and
+     you have to walk over to each one before you know a single thing about
+     them: what they say, what they ask for, and the one detail they are not
+     saying out loud. Hurry, and you allocate blind — the sheet at the store
+     shows a question mark next to everybody you did not go and see.
+
+     The store itself is a station. The allocation sheet only opens when you
+     are standing at the crate, and it keeps its state while you walk away to
+     go and look at somebody again.
+
    WHY THIS ENGINE IS DIFFERENT
      The Director routes here when the player's health hits zero — they wake up
      on somebody's floor. So this scene must work with an empty pack, floored
      stats and no items whatsoever. `requires` is unconditional, nothing is
-     gated on inventory, and sitting down here always returns a little health
-     and energy no matter how the split goes.
+     gated on inventory, sitting down here always returns a little health and
+     energy no matter how the split goes — and the room is lit by other
+     people's lamps, so a player who arrives with a dead light can still see
+     every face in it.
 
    WHAT IT LEAVES BEHIND
      `has_ally` (via an ally in the pack) or `has_enemy` — tags the Director
@@ -137,6 +150,58 @@
   function truthById(id) {
     for (var i = 0; i < TRUTHS.length; i++) if (TRUTHS[i].id === id) return TRUTHS[i];
     return TRUTHS[0];
+  }
+
+  /* =============================================================== TELLS == */
+  /* What you can see about somebody, but only from close up. One per truth,
+     deliberately written as an observation rather than a label: it is the
+     reward for walking over, not the answer key. Nothing here changes a single
+     number in resolve() — it only changes what you knew when you decided. */
+
+  var TELLS = {
+    overstated:  'There is a second bag behind them that they did not mention and did not mean you to see.',
+    understated: 'They steady themselves on the wall between sentences and pretend that is normal.',
+    critical:    'Their lips have gone the colour of the floor and they have stopped shivering.',
+    generous:    'They keep counting the others. They never once count themselves.',
+    thief:       'They know exactly how much is in there. They have already counted it twice.',
+    watching:    'They are not looking at the crate at all. They are looking at you.',
+    proud:       'They asked once, flatly, and have decided they are not going to ask again.'
+  };
+
+  /* ================================================================ ROOM == */
+  /* Hand-drawn so the walk is short and legible: five places people stand, a
+     store in the middle of it, and no corridor anybody has to trudge down.
+       #  wall   .  floor   1-5 where somebody is standing
+       D  the store          @  where you come in                            */
+
+  var ROOM = [
+    '###################',
+    '#..1....###....2..#',
+    '#.......#.#.......#',
+    '#..##...#.#...##..#',
+    '#..##....D....##..#',
+    '#.................#',
+    '#..##.........##..#',
+    '#..##....5....##..#',
+    '#..3.........4....#',
+    '#.................#',
+    '#@................#',
+    '###################'
+  ];
+
+  /** Rows of characters -> { w, h, tiles, spots } with 1 = solid. */
+  function readRoom(rows) {
+    var tiles = [], spots = {}, y, x, ch;
+    for (y = 0; y < rows.length; y++) {
+      var line = [];
+      for (x = 0; x < rows[y].length; x++) {
+        ch = rows[y].charAt(x);
+        line.push(ch === '#' ? 1 : 0);
+        if (ch !== '#' && ch !== '.') spots[ch] = { x: x, y: y };
+      }
+      tiles.push(line);
+    }
+    return { w: rows[0].length, h: rows.length, tiles: tiles, spots: spots };
   }
 
   /* ============================================================== BUILD === */
@@ -421,27 +486,32 @@
   /* ================================================================ CSS == */
 
   var CSS = [
-    '.pz-triage{display:grid;grid-template-columns:minmax(0,1fr) minmax(228px,286px);gap:18px;align-items:start}',
-    '@media (max-width:900px){.pz-triage{grid-template-columns:1fr}}',
+    '.pz-triage-panel{display:flex;flex-direction:column;gap:12px}',
+    '.pz-triage-morning{display:flex;flex-direction:column;gap:14px;max-width:780px;margin:0 auto}',
+    '.pz-triage-fallback{display:grid;grid-template-columns:minmax(0,1fr) minmax(228px,300px);gap:18px;align-items:start}',
+    '@media (max-width:900px){.pz-triage-fallback{grid-template-columns:1fr}}',
 
-    '.pz-triage-sheet{display:flex;flex-direction:column;gap:7px}',
-    '.pz-triage-row{display:grid;gap:8px;align-items:center;padding:9px 11px;border-radius:10px;',
+    '.pz-triage-sheet{display:flex;flex-direction:column;gap:8px}',
+    '.pz-triage-row{display:flex;flex-direction:column;gap:7px;padding:10px 11px;border-radius:10px;',
     '  background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line)}',
-    '.pz-triage-row.is-head{background:none;border-color:transparent;padding-top:0;padding-bottom:2px}',
     '.pz-triage-row.is-mine{border-color:color-mix(in srgb,var(--acc) 55%,transparent);',
     '  background:linear-gradient(180deg,var(--acc-wash),var(--panel))}',
+    '.pz-triage-row.is-unmet{border-style:dashed;border-color:var(--line-soft)}',
 
-    '.pz-triage-who{min-width:0}',
     '.pz-triage-who__top{display:flex;align-items:center;gap:7px}',
     '.pz-triage-who__ico{font-size:17px;line-height:1}',
     '.pz-triage-who__name{font-size:13px;font-weight:700;color:var(--text)}',
-    '.pz-triage-who__says{font-size:11.5px;line-height:1.45;color:var(--dim);margin-top:3px;font-style:italic}',
-    '.pz-triage-who__asks{font-family:var(--font-mono);font-size:10px;color:var(--dimmer);margin-top:4px}',
-    '.pz-triage-who__head{font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;',
-    '  text-transform:uppercase;color:var(--dimmer)}',
+    '.pz-triage-who__far{margin-left:auto;font-family:var(--font-mono);font-size:9px;letter-spacing:.12em;',
+    '  text-transform:uppercase;color:var(--dimmer);white-space:nowrap}',
+    '.pz-triage-who__says{font-size:11.5px;line-height:1.45;color:var(--dim);font-style:italic}',
+    '.pz-triage-who__asks{font-family:var(--font-mono);font-size:10px;color:var(--dimmer)}',
+    '.pz-triage-tell{font-size:11.5px;line-height:1.45;color:var(--acc-2);padding-left:8px;',
+    '  border-left:2px solid color-mix(in srgb,var(--acc) 55%,transparent)}',
 
-    '.pz-triage-cell{display:flex;flex-direction:column;align-items:center;gap:3px}',
-    '.pz-triage-cell__hd{font-size:15px;line-height:1}',
+    '.pz-triage-cells{display:flex;flex-wrap:wrap;gap:6px}',
+    '.pz-triage-cell{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:72px;flex:1 1 72px;',
+    '  padding:5px 4px;border-radius:8px;background:rgba(0,0,0,.26);border:1px solid var(--line-soft)}',
+    '.pz-triage-cell__hd{font-size:14px;line-height:1}',
     '.pz-triage-cell__lb{font-family:var(--font-mono);font-size:9px;color:var(--dimmer);text-align:center;line-height:1.2}',
     '.pz-triage-cell__lb b{color:var(--acc-2);font-weight:700}',
     '.pz-triage-cell__lb.is-empty b{color:var(--bad)}',
@@ -476,7 +546,7 @@
     '.pz-triage-warn.is-bad{color:var(--bad);background:rgba(226,105,95,.08);border-color:rgba(226,105,95,.28)}',
 
     '.pz-triage-tally{display:flex;flex-direction:column;gap:6px}',
-    '.pz-triage-tally__row{display:flex;justify-content:space-between;font-family:var(--font-mono);',
+    '.pz-triage-tally__row{display:flex;justify-content:space-between;gap:10px;font-family:var(--font-mono);',
     '  font-size:11px;color:var(--dim)}',
     '.pz-triage-tally__row b{color:var(--acc-2)}'
   ].join('\n');
@@ -491,20 +561,27 @@
     var res = puzzle.resList;
     var n = puzzle.people.length;
     var finished = false;
+    var arena = null;
+    var met = [];
+    var s0;
+    for (s0 = 0; s0 < n; s0++) met.push(false);
 
     var sheet = h('div', { class: 'pz-triage-sheet' });
     var pools = h('div', { class: 'pz-triage-pools' });
     var tally = h('div', { class: 'pz-triage-tally' });
     var warnBox = h('div', {});
-    var stage = h('div', { class: 'pz-col' });
+    var stage = h('div', {});                       // the room lives here, then the morning does
+    var panelRoot = h('div', { class: 'pz-triage-panel' });
 
     var handBtn = h('button', { class: 'pz-btn pz-btn--primary', type: 'button', text: '\uD83E\uDD1D Hand it out' });
     var evenBtn = h('button', { class: 'pz-btn pz-btn--sm', type: 'button', text: '\u2696\uFE0F Even split' });
-    var needBtn = h('button', { class: 'pz-btn pz-btn--sm', type: 'button', text: '\uD83D\uDCCB As asked, in order' });
+    var needBtn = h('button', { class: 'pz-btn pz-btn--sm', type: 'button', text: '\uD83D\uDCCB As asked' });
     var clearBtn = h('button', { class: 'pz-btn pz-btn--sm', type: 'button', text: '\u21BA Start again' });
     var walkBtn = h('button', { class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button', text: '\u21A9 Walk away from it' });
 
-    var cols = 'minmax(0,1.7fr) repeat(' + res.length + ', minmax(66px,.55fr))';
+    var cMet = null, cLeft = null, cKept = null;
+
+    PS.ui.append(el, stage);
 
     /* ------------------------------------------------------------- pools -- */
 
@@ -524,13 +601,86 @@
       paint();
     }
 
-    /* -------------------------------------------------------------- rows -- */
+    /* --------------------------------------------------------------- room -- */
+    /* Everything the sheet knows about a person, it knows because you walked
+       over there. Meeting somebody is the only way in.                       */
+
+    function meet(idx) {
+      if (met[idx] || finished) return;
+      met[idx] = true;
+      var p = puzzle.people[idx];
+      api.toast(p.name + ': \u201C' + p.says + '\u201D', 'info', 5200);
+      var tell = TELLS[p.truth];
+      if (tell) api.toast(tell, 'bad', 5600);
+      paint();
+    }
+
+    function metCount() {
+      var c = 0;
+      for (var s = 0; s < n; s++) if (met[s]) c++;
+      return c;
+    }
+
+    function buildRoom() {
+      if (!PS.arena || typeof PS.arena.create !== 'function') return false;
+
+      var room = readRoom(ROOM);
+      var spawn = room.spots['@'] || { x: 1, y: 1 };
+
+      arena = PS.arena.create(stage, {
+        map: { w: room.w, h: room.h, tiles: room.tiles },
+        spawn: spawn,
+        avatar: '\uD83E\uDDCD',
+        light: state.stats.light,
+        // Other people's lamps light this room, not yours. A player the
+        // Director sent here at zero light must still see every face in it.
+        lightCurve: function (v) { return 5.2 + Math.min(100, Math.max(0, v)) / 100 * 3; },
+        darkness: 0.5,
+        memory: 0.72
+      });
+      if (!arena) return false;
+
+      teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
+      arena.revealAll();
+
+      cMet = arena.chip('Spoken to', '\uD83D\uDDE3\uFE0F');
+      cLeft = arena.chip('Undealt', '\uD83D\uDCE6');
+      cKept = arena.chip('Kept back', '\uD83E\uDDCD');
+
+      for (var s = 0; s < n; s++) {
+        (function (idx) {
+          var spot = room.spots[String(idx + 1)];
+          if (!spot) return;
+          var p = puzzle.people[idx];
+          arena.prop({
+            x: spot.x, y: spot.y, icon: p.icon, label: p.name,
+            hint: 'go and listen', trigger: 'proximity', radius: 1.5,
+            once: false, emits: 0.55,
+            onActivate: function () { meet(idx); }
+          });
+        })(s);
+      }
+
+      var crate = room.spots.D || { x: 1, y: 1 };
+      arena.station({
+        x: crate.x, y: crate.y, icon: '\uD83D\uDCE6', label: C.crate,
+        hint: 'open it in front of them', radius: 1.5, emits: 2.1,
+        onEnter: function (panelEl) { PS.ui.append(panelEl, panelRoot); }
+      });
+
+      arena.note('Walk over to every one of them before you open ' + C.crate +
+        ' \u2014 the sheet only knows what you have gone and found out.');
+      return true;
+    }
+
+    /* -------------------------------------------------------------- cards -- */
 
     function stepper(sIdx, k) {
       var cur = sIdx < 0 ? puzzle.mine[k] : puzzle.alloc[sIdx][k];
+      var known = sIdx < 0 || met[sIdx];
       var asked = sIdx < 0 ? 0 : puzzle.people[sIdx].stated[k];
       var cls = 'pz-triage-step__n';
-      if (sIdx >= 0 && asked > 0 && cur < asked) cls += ' is-short';
+      if (known && sIdx >= 0 && asked > 0 && cur < asked) cls += ' is-short';
       if (cur === 0) cls += ' is-none';
 
       var minus = h('button', { type: 'button', text: '\u2212' });
@@ -540,60 +690,64 @@
       minus.addEventListener('click', function () { adjust(sIdx, k, -1); });
       plus.addEventListener('click', function () { adjust(sIdx, k, 1); });
 
+      var label;
+      if (sIdx < 0) label = [h('b', { text: puzzle.labels[k] })];
+      else if (!known) label = [h('b', { text: 'asked ?' })];
+      else label = [h('b', { text: 'asked ' + asked })];
+
       return h('div', { class: 'pz-triage-cell' }, [
+        h('div', { class: 'pz-triage-cell__hd', text: RES_ICON[k] }),
         h('div', { class: 'pz-triage-step' }, [minus, h('div', { class: cls, text: String(cur) }), plus]),
-        h('div', { class: 'pz-triage-cell__lb' + (sIdx >= 0 && asked > 0 && cur === 0 ? ' is-empty' : '') },
-          sIdx < 0 ? [' '] : [h('b', { text: 'asked ' + asked })])
+        h('div', { class: 'pz-triage-cell__lb' + (known && sIdx >= 0 && asked > 0 && cur === 0 ? ' is-empty' : '') }, label)
       ]);
+    }
+
+    function personCard(idx) {
+      var p = puzzle.people[idx];
+      var known = met[idx];
+      var bits = [];
+
+      var top = h('div', { class: 'pz-triage-who__top' }, [
+        h('span', { class: 'pz-triage-who__ico', text: p.icon }),
+        h('span', { class: 'pz-triage-who__name', text: p.name }),
+        known ? null : h('span', { class: 'pz-triage-who__far', text: 'not spoken to' })
+      ]);
+      bits.push(top);
+
+      if (known) {
+        bits.push(h('div', { class: 'pz-triage-who__says', text: '\u201C' + p.says + '\u201D' }));
+        if (TELLS[p.truth]) bits.push(h('div', { class: 'pz-triage-tell', text: TELLS[p.truth] }));
+        var asksBits = [];
+        for (var q = 0; q < res.length; q++) {
+          if (p.stated[res[q]] > 0) asksBits.push(RES_ICON[res[q]] + p.stated[res[q]]);
+        }
+        bits.push(h('div', { class: 'pz-triage-who__asks', text: 'asks for  ' + asksBits.join('   ') }));
+      } else {
+        bits.push(h('div', { class: 'pz-triage-who__says',
+          text: 'You have not been over to them. Whatever they need, you would be guessing at it.' }));
+      }
+
+      var cells = h('div', { class: 'pz-triage-cells' });
+      for (var r = 0; r < res.length; r++) cells.appendChild(stepper(idx, res[r]));
+      bits.push(cells);
+
+      return h('div', { class: 'pz-triage-row' + (known ? '' : ' is-unmet') }, bits);
     }
 
     function paintSheet() {
       PS.ui.clear(sheet);
+      for (var s = 0; s < n; s++) sheet.appendChild(personCard(s));
 
-      var head = h('div', { class: 'pz-triage-row is-head', style: { gridTemplateColumns: cols } }, [
-        h('div', { class: 'pz-triage-who__head', text: 'Who' })
-      ]);
-      for (var r = 0; r < res.length; r++) {
-        head.appendChild(h('div', { class: 'pz-triage-cell' }, [
-          h('div', { class: 'pz-triage-cell__hd', text: RES_ICON[res[r]] }),
-          h('div', { class: 'pz-triage-cell__lb', text: puzzle.labels[res[r]] })
-        ]));
-      }
-      sheet.appendChild(head);
-
-      for (var s = 0; s < n; s++) {
-        (function (idx) {
-          var p = puzzle.people[idx];
-          var asksBits = [];
-          for (var q = 0; q < res.length; q++) {
-            if (p.stated[res[q]] > 0) asksBits.push(RES_ICON[res[q]] + p.stated[res[q]]);
-          }
-          var row = h('div', { class: 'pz-triage-row', style: { gridTemplateColumns: cols } }, [
-            h('div', { class: 'pz-triage-who' }, [
-              h('div', { class: 'pz-triage-who__top' }, [
-                h('span', { class: 'pz-triage-who__ico', text: p.icon }),
-                h('span', { class: 'pz-triage-who__name', text: p.name })
-              ]),
-              h('div', { class: 'pz-triage-who__says', text: '\u201C' + p.says + '\u201D' }),
-              h('div', { class: 'pz-triage-who__asks', text: 'asks for  ' + asksBits.join('   ') })
-            ])
-          ]);
-          for (var q2 = 0; q2 < res.length; q2++) row.appendChild(stepper(idx, res[q2]));
-          sheet.appendChild(row);
-        })(s);
-      }
-
-      var mineRow = h('div', { class: 'pz-triage-row is-mine', style: { gridTemplateColumns: cols } }, [
-        h('div', { class: 'pz-triage-who' }, [
-          h('div', { class: 'pz-triage-who__top' }, [
-            h('span', { class: 'pz-triage-who__ico', text: '\uD83E\uDDCD' }),
-            h('span', { class: 'pz-triage-who__name', text: 'You' })
-          ]),
-          h('div', { class: 'pz-triage-who__says', text: youLine() })
-        ])
-      ]);
-      for (var r2 = 0; r2 < res.length; r2++) mineRow.appendChild(stepper(-1, res[r2]));
-      sheet.appendChild(mineRow);
+      var mineCells = h('div', { class: 'pz-triage-cells' });
+      for (var r = 0; r < res.length; r++) mineCells.appendChild(stepper(-1, res[r]));
+      sheet.appendChild(h('div', { class: 'pz-triage-row is-mine' }, [
+        h('div', { class: 'pz-triage-who__top' }, [
+          h('span', { class: 'pz-triage-who__ico', text: '\uD83E\uDDCD' }),
+          h('span', { class: 'pz-triage-who__name', text: 'You' })
+        ]),
+        h('div', { class: 'pz-triage-who__says', text: youLine() }),
+        mineCells
+      ]));
     }
 
     function youLine() {
@@ -604,6 +758,7 @@
     }
 
     function paint() {
+      if (finished) return;
       paintSheet();
 
       PS.ui.clear(pools);
@@ -627,22 +782,28 @@
       }
       PS.ui.append(tally, [
         trow('In the crate', String(poolTotal) + ' units'),
-        trow('Asked for', String(askedTotal) + ' units'),
-        trow('Shortfall', String(askedTotal - poolTotal) + ' units'),
+        trow('Spoken to', metCount() + ' of ' + n),
         trow('Kept back for you', String(minePicked)),
         trow('Still undealt', String(anyLeft))
       ]);
 
+      needBtn.disabled = finished || metCount() === 0;
+
       PS.ui.clear(warnBox);
-      if (!finished) {
-        if (anyLeft > 0) {
-          warnBox.appendChild(h('div', { class: 'pz-triage-warn' },
-            [anyLeft + ' unit' + (anyLeft === 1 ? '' : 's') + ' still in the crate. ' + C.leftover]));
-        } else {
-          warnBox.appendChild(h('div', { class: 'pz-triage-warn is-bad' },
-            ['Everything is spoken for. There is no arrangement of this that covers everybody \u2014 there was never going to be.']));
-        }
+      if (metCount() < n) {
+        warnBox.appendChild(h('div', { class: 'pz-triage-warn' },
+          [(n - metCount()) + ' of them you have not been over to. You can still write a number against their name; you will just be inventing it.']));
+      } else if (anyLeft > 0) {
+        warnBox.appendChild(h('div', { class: 'pz-triage-warn' },
+          [anyLeft + ' unit' + (anyLeft === 1 ? '' : 's') + ' still in the crate. ' + C.leftover]));
+      } else {
+        warnBox.appendChild(h('div', { class: 'pz-triage-warn is-bad' },
+          ['Everything is spoken for. There is no arrangement of this that covers everybody \u2014 there was never going to be.']));
       }
+
+      if (cMet) cMet.set(metCount() + ' / ' + n, metCount() < n ? 'warn' : null);
+      if (cLeft) cLeft.set(String(anyLeft));
+      if (cKept) cKept.set(String(minePicked));
 
       function trow(a, b) {
         return h('div', { class: 'pz-triage-tally__row' }, [h('span', { text: a }), h('b', { text: b })]);
@@ -666,12 +827,15 @@
       paint();
     });
 
+    // Only fills the rows of people you have actually stood in front of —
+    // otherwise the shortcut would hand you every figure in the room for free.
     needBtn.addEventListener('click', function () {
       if (finished) return;
       clearAll();
       for (var r = 0; r < res.length; r++) {
         var k = res[r], remain = puzzle.pool[k];
         for (var s = 0; s < n && remain > 0; s++) {
+          if (!met[s]) continue;
           var take = Math.min(remain, puzzle.people[s].stated[k]);
           puzzle.alloc[s][k] = take;
           remain -= take;
@@ -686,14 +850,15 @@
 
     handBtn.addEventListener('click', function () {
       if (finished) return;
+      var out = resolve(puzzle);
       finished = true;
       puzzle.handedOut = true;
-      var out = resolve(puzzle);
+      if (arena) { arena.destroy(); arena = null; }
+      cMet = cLeft = cKept = null;
       renderFates(out);
     });
 
     function renderFates(out) {
-      paint();
       PS.ui.clear(stage);
 
       var cards = [];
@@ -733,13 +898,16 @@
         ]));
       }
 
-      PS.ui.append(stage, [
+      var missed = n - metCount();
+      PS.ui.append(stage, h('div', { class: 'pz-triage-morning' }, [
         h('div', { class: 'pz-intro', text: out.cut === 0
           ? 'Nobody at ' + C.place + ' went without. It came out of you and everybody knows exactly where it came from.'
           : 'It is done, and it is morning, and now you find out what everyone was not telling you.' }),
+        missed > 0 ? h('div', { class: 'pz-triage-warn is-bad', text:
+          'You never went over to ' + missed + ' of them. You find out what they needed at the same time as everybody else does.' }) : null,
         h('div', { class: 'pz-col' }, cards),
         h('div', { class: 'pz-choices' }, [branch(C.branchA, out), branch(C.branchB, out)])
-      ]);
+      ]));
 
       if (out.crises || out.enemies.length) api.toast('Some of that is going to follow you.', 'bad', 4200);
       else if (out.ally) api.flash();
@@ -762,6 +930,7 @@
     walkBtn.addEventListener('click', function () {
       if (finished) return;
       finished = true;
+      if (arena) { arena.destroy(); arena = null; }
       api.finish({
         outcome: 'fail',
         stats: { health: 2, energy: 4, morale: -18 },
@@ -775,29 +944,25 @@
 
     /* ------------------------------------------------------------- layout -- */
 
-    PS.ui.append(el, h('div', { class: 'pz-triage' }, [
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-note', text: C.lead }),
-        sheet,
-        h('div', { class: 'pz-row' }, [handBtn, evenBtn, needBtn, clearBtn]),
-        stage
-      ]),
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'What there is' }),
-          pools
-        ]),
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'The arithmetic' }),
-          tally
-        ]),
-        warnBox,
-        h('div', { class: 'pz-note', text: 'What you keep goes into you \u2014 food and water for energy, medicine for the bleeding, fuel for the lamp. Nobody will stop you. That is the difficulty.' }),
-        walkBtn
-      ])
-    ]));
+    PS.ui.append(panelRoot, [
+      h('div', { class: 'pz-note', text: C.lead }),
+      pools,
+      sheet,
+      h('div', { class: 'pz-row' }, [handBtn, evenBtn, needBtn, clearBtn]),
+      tally,
+      warnBox,
+      h('div', { class: 'pz-note', text: 'What you keep goes into you. Nobody will stop you. That is the difficulty.' }),
+      walkBtn
+    ]);
+
+    if (!buildRoom()) {
+      // No arena layer: nothing is hidden, because nothing can be walked to.
+      for (s0 = 0; s0 < n; s0++) met[s0] = true;
+      PS.ui.append(stage, h('div', { class: 'pz-triage-fallback' }, [panelRoot]));
+    }
 
     paint();
+    if (arena) arena.focus();
   }
 
   function unmount() {

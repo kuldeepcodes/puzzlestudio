@@ -21,6 +21,13 @@
      is folded into the graph BEFORE the BFS runs, so the optimum you are
      scored against is the optimum you actually have.
 
+   THE MARKET (arena)
+     Nobody's rates are on a board. Each trader is a person standing at their
+     own table, and you only see what they will take when you have walked over
+     and stood in front of them. What you are carrying rides with you in the
+     HUD, so the question at every table is the same one a real market asks:
+     is this the table I should be spending my rope at, or is it two down?
+
    THE BRANCH
      Trade done, you either stay in the market and keep working it, or take
      what you came for and walk. The Director reads that.
@@ -401,6 +408,7 @@
   var CSS = [
     '.pz-barter{display:grid;grid-template-columns:minmax(0,1fr) minmax(230px,300px);gap:18px;align-items:start}',
     '@media (max-width:880px){.pz-barter{grid-template-columns:1fr}}',
+    '.pz-barter-stage{display:flex;flex-direction:column;gap:14px}',
 
     '.pz-barter-tables{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(228px,1fr))}',
     '.pz-barter-node{position:relative;display:flex;flex-direction:column;gap:9px;padding:12px 13px;',
@@ -408,6 +416,8 @@
     '  box-shadow:var(--sh-1);transition:border-color .2s var(--ease),transform .2s var(--ease)}',
     '.pz-barter-node:hover{border-color:color-mix(in srgb,var(--acc) 45%,var(--line))}',
     '.pz-barter-node.is-live{border-color:color-mix(in srgb,var(--acc) 60%,var(--line))}',
+    '.pz-barter-node.is-panel{border:none;background:none;box-shadow:none;padding:0}',
+    '.pz-barter-node.is-panel:hover{border:none}',
 
     '.pz-barter-who{display:flex;gap:9px;align-items:flex-start}',
     '.pz-barter-who__i{font-size:22px;line-height:1.1}',
@@ -465,14 +475,30 @@
     var C = puzzle.content;
     var finished = false;
     var lastTouched = -1;
+    var arena = null;
 
-    var holdBox   = h('div', { class: 'pz-barter-hold' });
+    var stage = h('div', { class: 'pz-barter-stage' });
+    var mapHost = h('div', {});
+    var endBox = h('div', {});
     var tablesBox = h('div', { class: 'pz-barter-tables' });
-    var meterBox  = h('div', { class: 'pz-barter-meter' });
-    var logBox    = h('div', { class: 'pz-barter-log' });
-    var warnBox   = h('div', {});
+    var meterBox = h('div', { class: 'pz-barter-meter' });
+    var logBox = h('div', { class: 'pz-barter-log' });
+    var warnBox = h('div', {});
     var actionBox = h('div', { class: 'pz-col' });
     var offerBtns = {};
+    var holdBoxes = [];
+    var cards = [];
+    var stations = [];
+    var cTrades = null, cLeft = null, cHold = null;
+    var noteEl = null;
+    var NOTE = 'Nobody down here posts a rate. Walk up to a ' + C.traderWord +
+      ' to see what they take \u2014 what you are carrying goes with you.';
+
+    /* Goods only appear in the pack row once they have passed through your
+       hands (plus the target, always, so you never lose sight of the point).
+       Listing every good in the graph would be a wall of zeroes. */
+    var everHeld = {};
+    for (var ei = 0; ei < puzzle.hold.length; ei++) if (puzzle.hold[ei] > 0) everHeld[ei] = true;
 
     function goodName(i) { return PS.state.itemInfo(puzzle.names[i]).name; }
     function goodIcon(i) { return PS.state.itemInfo(puzzle.names[i]).icon; }
@@ -480,29 +506,36 @@
     /* ------------------------------------------------------------- render -- */
 
     function paintHold() {
-      PS.ui.clear(holdBox);
-      var shown = 0;
-      for (var i = 0; i < puzzle.names.length; i++) {
-        var n = puzzle.hold[i];
-        var isTarget = i === puzzle.target;
-        if (n > 0) everHeld[i] = true;
-        if (!n && !isTarget && !everHeld[i]) continue;
-        shown++;
-        var cls = 'pz-barter-good' + (n === 0 ? ' is-zero' : '') + (isTarget ? ' is-target' : '') +
-          (i === lastTouched ? ' is-bump' : '');
-        holdBox.appendChild(h('span', { class: cls }, [
-          goodIcon(i), h('b', { text: String(n) }), ' ' + goodName(i)
-        ]));
+      for (var b = 0; b < holdBoxes.length; b++) {
+        var box = holdBoxes[b];
+        PS.ui.clear(box);
+        var shown = 0;
+        for (var i = 0; i < puzzle.names.length; i++) {
+          var n = puzzle.hold[i];
+          var isTarget = i === puzzle.target;
+          if (n > 0) everHeld[i] = true;
+          if (!n && !isTarget && !everHeld[i]) continue;
+          shown++;
+          var cls = 'pz-barter-good' + (n === 0 ? ' is-zero' : '') + (isTarget ? ' is-target' : '') +
+            (i === lastTouched ? ' is-bump' : '');
+          box.appendChild(h('span', { class: cls }, [
+            goodIcon(i), h('b', { text: String(n) }), ' ' + goodName(i)
+          ]));
+        }
+        if (!shown) box.appendChild(h('span', { class: 'pz-note', text: 'Empty-handed.' }));
       }
-      if (!shown) holdBox.appendChild(h('span', { class: 'pz-note', text: 'Empty-handed.' }));
       lastTouched = -1;
     }
 
-    /* Goods only appear in the pack row once they have passed through your
-       hands (plus the target, always, so you never lose sight of the point).
-       Listing every good in the graph would be a wall of zeroes. */
-    var everHeld = {};
-    for (var ei = 0; ei < puzzle.hold.length; ei++) if (puzzle.hold[ei] > 0) everHeld[ei] = true;
+    /** A compact "what is in your hands" string for the HUD. */
+    function holdLine() {
+      var bits = [];
+      for (var i = 0; i < puzzle.names.length; i++) {
+        if (!puzzle.hold[i]) continue;
+        bits.push(goodIcon(i) + puzzle.hold[i]);
+      }
+      return bits.length ? bits.join(' ') : 'nothing';
+    }
 
     function offerRow(idx) {
       var o = puzzle.offers[idx];
@@ -531,39 +564,49 @@
       return btn;
     }
 
-    function paintTables() {
-      PS.ui.clear(tablesBox);
-      for (var i = 0; i < puzzle.traders.length; i++) {
-        var tr = puzzle.traders[i];
-        var rows = [];
-        var live = false;
-        for (var j = 0; j < tr.offers.length; j++) {
-          rows.push(offerRow(tr.offers[j]));
-          if (canAfford(puzzle.hold, puzzle.offers[tr.offers[j]])) live = true;
-        }
-        var brokeredHere = false;
-        for (j = 0; j < tr.offers.length; j++) if (puzzle.offers[tr.offers[j]].brokered) brokeredHere = true;
+    /** One trader, as a card. In the arena this card IS their station panel. */
+    function traderCard(i, inPanel) {
+      var tr = puzzle.traders[i];
+      var rows = [], j;
+      for (j = 0; j < tr.offers.length; j++) rows.push(offerRow(tr.offers[j]));
 
-        var card = h('div', { class: 'pz-barter-node' + (live ? ' is-live' : '') }, [
-          brokeredHere ? h('div', { class: 'pz-barter-flag', text: 'brokered' }) : null,
-          h('div', { class: 'pz-barter-who' }, [
-            h('div', { class: 'pz-barter-who__i', text: tr.icon }),
-            h('div', {}, [
-              h('div', { class: 'pz-barter-who__n', text: tr.name }),
-              h('div', { class: 'pz-barter-who__l', text: tr.line })
-            ])
-          ]),
-          rows
-        ]);
-        tablesBox.appendChild(card);
-      }
-      refreshButtons();
+      var brokeredHere = false;
+      for (j = 0; j < tr.offers.length; j++) if (puzzle.offers[tr.offers[j]].brokered) brokeredHere = true;
+
+      var hold = h('div', { class: 'pz-barter-hold' });
+      if (inPanel) holdBoxes.push(hold);
+
+      var card = h('div', { class: 'pz-barter-node' + (inPanel ? ' is-panel' : '') }, [
+        brokeredHere ? h('div', { class: 'pz-barter-flag', text: 'brokered' }) : null,
+        h('div', { class: 'pz-barter-who' }, [
+          h('div', { class: 'pz-barter-who__i', text: tr.icon }),
+          h('div', {}, [
+            h('div', { class: 'pz-barter-who__n', text: tr.name }),
+            h('div', { class: 'pz-barter-who__l', text: tr.line })
+          ])
+        ]),
+        rows,
+        inPanel ? h('div', { class: 'pz-card' }, [
+          h('div', { class: 'pz-card__head', text: C.holdWord }),
+          hold
+        ]) : null
+      ]);
+      cards.push(card);
+      return card;
     }
 
     function refreshButtons() {
       for (var idx in offerBtns) {
         if (!Object.prototype.hasOwnProperty.call(offerBtns, idx)) continue;
-        offerBtns[idx].disabled = finished || !canAfford(puzzle.hold, puzzle.offers[idx]);
+        offerBtns[idx].disabled = finished || puzzle.done || !canAfford(puzzle.hold, puzzle.offers[idx]);
+      }
+      for (var c = 0; c < cards.length; c++) {
+        var tr = puzzle.traders[c];
+        var live = false;
+        for (var j = 0; j < tr.offers.length; j++) {
+          if (canAfford(puzzle.hold, puzzle.offers[tr.offers[j]])) live = true;
+        }
+        cards[c].className = 'pz-barter-node' + (arena ? ' is-panel' : '') + (live && !puzzle.done ? ' is-live' : '');
       }
     }
 
@@ -581,11 +624,21 @@
         row('Walked back', String(puzzle.backtracks))
       ]);
 
+      if (cTrades) cTrades.set(puzzle.trades + ' / ' + puzzle.optimal + ' best');
+      if (cLeft) cLeft.set(left.steps < 0 ? 'stuck' : String(left.steps), left.steps < 0 ? 'bad' : null);
+      if (cHold) cHold.set(holdLine());
+
       PS.ui.clear(warnBox);
       if (left.steps < 0 && !puzzle.done) {
         warnBox.appendChild(h('div', { class: 'pz-barter-stuck' },
           ['You have traded yourself into a corner \u2014 nothing on these ' + C.tableWord +
             's turns what you are holding into what you need. Walk a trade back.']));
+        // The side panel is not on screen in the arena, so the same warning has
+        // to reach the player where they are actually standing.
+        if (noteEl) noteEl.textContent = 'You have traded yourself into a corner. Nothing on these ' +
+          C.tableWord + 's turns what you are holding into what you need \u2014 take a trade back.';
+      } else if (noteEl && !puzzle.done) {
+        noteEl.textContent = NOTE;
       }
 
       function row(k, v, warn) {
@@ -616,6 +669,72 @@
       paintLog();
     }
 
+    /* ------------------------------------------------------------- market -- */
+    /* Two rows of tables down one aisle, sized to however many traders the
+       graph dealt out. Their rates are not on a board anywhere: you find out
+       what somebody takes by walking over and standing in front of them.     */
+
+    function marketMap(n) {
+      var cols = Math.max(1, Math.ceil(n / 2));
+      var w = cols * 4 + 5, hgt = 11;
+      var tiles = [], spots = [], x, y;
+      for (y = 0; y < hgt; y++) {
+        var line = [];
+        for (x = 0; x < w; x++) line.push((y === 0 || y === hgt - 1 || x === 0 || x === w - 1) ? 1 : 0);
+        tiles.push(line);
+      }
+      for (var i = 0; i < n; i++) {
+        var col = Math.floor(i / 2), top = (i % 2) === 0;
+        var tx = 3 + col * 4;
+        var ty = top ? 1 : hgt - 2;
+        tiles[ty][tx] = 1;
+        if (tx + 1 < w - 1) tiles[ty][tx + 1] = 1;
+        spots.push({ x: tx, y: top ? 2 : hgt - 3 });
+      }
+      return { w: w, h: hgt, tiles: tiles, spots: spots, spawn: { x: 1, y: 5 } };
+    }
+
+    function buildMarket() {
+      if (!PS.arena || typeof PS.arena.create !== 'function') return false;
+
+      var m = marketMap(puzzle.traders.length);
+      arena = PS.arena.create(mapHost, {
+        map: { w: m.w, h: m.h, tiles: m.tiles },
+        spawn: m.spawn,
+        avatar: '\uD83E\uDDCD',
+        light: state.stats.light,
+        lightCurve: function (v) { return 4.2 + Math.min(100, Math.max(0, v)) / 100 * 3.4; },
+        darkness: 0.6,
+        memory: 0.66
+      });
+      if (!arena) return false;
+      teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
+
+      var targetInfo = PS.state.itemInfo(puzzle.names[puzzle.target]);
+      arena.chip('Wanted', targetInfo.icon).set(targetInfo.name);
+      cHold = arena.chip('Carrying', '\uD83C\uDF92');
+      cTrades = arena.chip('Trades', '\uD83E\uDD1D');
+      cLeft = arena.chip('From here', '\uD83E\uDDED');
+
+      for (var i = 0; i < puzzle.traders.length; i++) {
+        (function (idx) {
+          var tr = puzzle.traders[idx];
+          var spot = m.spots[idx];
+          var root = traderCard(idx, true);
+          stations.push(arena.station({
+            x: spot.x, y: spot.y, icon: tr.icon, label: tr.name,
+            hint: 'see what they take', radius: 1.3, emits: 1.5,
+            onEnter: function (panelEl) { PS.ui.append(panelEl, root); refreshButtons(); }
+          }));
+        })(i);
+      }
+
+      noteEl = arena.note(NOTE);
+      arena.button('\u21A9 Take that back', undo, 'pz-btn--sm');
+      arena.button('\uD83D\uDEB6 Walk away', walkAway, 'pz-btn--danger');
+      return true;
+    }
+
     /* ------------------------------------------------------------ trading -- */
 
     var history = [];
@@ -640,15 +759,14 @@
       // Haggling is work. Not much, but it is not free either.
       api.tweak({ energy: -1 });
       if (o.brokered) api.toast(C.brokerLine, 'good', 2600);
+      if (arena) arena.ping(arena.player().tx, arena.player().ty);
 
       if (puzzle.hold[puzzle.target] > 0) {
         puzzle.done = true;
-        paintTables();
         repaint();
         renderEnd();
         return;
       }
-      paintTables();
       repaint();
     }
 
@@ -660,14 +778,12 @@
       puzzle.backtracks++;
       puzzle.log.push({ text: '\u21A9 took back: ' + describe(puzzle.offers[prev.idx]), back: true });
       api.tweak({ morale: -1 });
-      paintTables();
       repaint();
     }
 
     /* ------------------------------------------------------------ endings -- */
 
     function renderEnd() {
-      PS.ui.clear(actionBox);
       var over = puzzle.trades - puzzle.optimal;
       var verdict = over <= 0
         ? 'You did it in the fewest moves the ' + C.marketWord + ' allows.'
@@ -675,11 +791,23 @@
           ? 'Two or three units lighter than you had to be, but you got it.'
           : 'It cost you a lot more than it should have.');
 
-      PS.ui.append(actionBox, [
+      for (var s = 0; s < stations.length; s++) stations[s].solve();
+      if (arena) {
+        arena.closePanel();
+        if (noteEl) noteEl.textContent = 'You have it. Nothing else on this ' + C.tableWord + ' is worth what it costs.';
+      }
+
+      PS.ui.clear(actionBox);
+      PS.ui.clear(endBox);
+      PS.ui.append(endBox, [
         h('div', { class: 'pz-intro', text: C.done + ' ' + verdict + ' (' + puzzle.trades + ' trades, best possible ' + puzzle.optimal + '.)' }),
         h('div', { class: 'pz-choices' }, [
           choiceBtn(C.stay, 'trade'),
           choiceBtn(C.go, 'scavenge')
+        ]),
+        h('div', { class: 'pz-card' }, [
+          h('div', { class: 'pz-card__head', text: 'Deals struck' }),
+          logBox
         ])
       ]);
       api.flash();
@@ -764,58 +892,50 @@
     /* ------------------------------------------------------------- layout -- */
 
     var targetInfo = PS.state.itemInfo(puzzle.names[puzzle.target]);
-
-    PS.ui.append(actionBox, [
-      h('button', {
-        class: 'pz-btn pz-btn--sm', type: 'button', onclick: undo
-      }, ['\u21A9 Take that back']),
-      h('button', {
-        class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button', onclick: walkAway
-      }, ['\uD83D\uDEB6 Walk away'])
+    var goalCard = h('div', { class: 'pz-barter-goal' }, [
+      h('div', { class: 'pz-barter-goal__i', text: targetInfo.icon }),
+      h('div', {}, [
+        h('div', { class: 'pz-barter-goal__t', text: C.targetLead + ': ' + targetInfo.name }),
+        h('div', { class: 'pz-barter-goal__d', text: targetInfo.desc + ' Nobody here sells it for anything you are carrying \u2014 not directly.' })
+      ])
     ]);
 
-    PS.ui.append(el, h('div', { class: 'pz-barter' }, [
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-barter-goal' }, [
-          h('div', { class: 'pz-barter-goal__i', text: targetInfo.icon }),
-          h('div', {}, [
-            h('div', { class: 'pz-barter-goal__t', text: C.targetLead + ': ' + targetInfo.name }),
-            h('div', { class: 'pz-barter-goal__d', text: targetInfo.desc + ' Nobody here sells it for anything you are carrying \u2014 not directly.' })
-          ])
-        ]),
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: C.holdWord }),
-          holdBox
-        ]),
-        tablesBox,
-        h('div', { class: 'pz-note' }, [
-          'Every ', h('strong', { text: C.traderWord }), ' takes one thing and gives another, at a rate that does not move. ',
-          'Chain them. Greyed-out offers are ones you cannot pay for yet.'
-        ])
-      ]),
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'Ledger' }),
-          meterBox
-        ]),
-        warnBox,
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'Deals struck' }),
-          logBox
-        ]),
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'Options' }),
-          actionBox
-        ])
-      ])
-    ]));
+    PS.ui.append(stage, [goalCard, mapHost, endBox]);
+    PS.ui.append(el, stage);
 
-    paintTables();
+    if (!buildMarket()) {
+      // No arena layer: every table is on screen at once, the old way.
+      var holdBox = h('div', { class: 'pz-barter-hold' });
+      holdBoxes.push(holdBox);
+      for (var t = 0; t < puzzle.traders.length; t++) tablesBox.appendChild(traderCard(t, false));
+
+      PS.ui.append(actionBox, [
+        h('button', { class: 'pz-btn pz-btn--sm', type: 'button', onclick: undo }, ['\u21A9 Take that back']),
+        h('button', { class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button', onclick: walkAway }, ['\uD83D\uDEB6 Walk away'])
+      ]);
+
+      PS.ui.clear(mapHost);
+      PS.ui.append(mapHost, h('div', { class: 'pz-barter' }, [
+        h('div', { class: 'pz-col' }, [
+          h('div', { class: 'pz-card' }, [
+            h('div', { class: 'pz-card__head', text: C.holdWord }),
+            holdBox
+          ]),
+          tablesBox
+        ]),
+        h('div', { class: 'pz-col' }, [
+          h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'Ledger' }), meterBox]),
+          warnBox,
+          h('div', { class: 'pz-card' }, [h('div', { class: 'pz-card__head', text: 'Options' }), actionBox])
+        ])
+      ]));
+    }
+
     repaint();
+    if (arena) arena.focus();
 
     teardownFns.push(function () { offerBtns = {}; history.length = 0; });
   }
-
   function unmount() {
     while (teardownFns.length) {
       try { teardownFns.pop()(); } catch (e) { /* keep unwinding */ }
