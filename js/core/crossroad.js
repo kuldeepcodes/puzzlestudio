@@ -268,9 +268,40 @@
   }
 
   /** Headless helper the autoplay bot and smoke test use. */
+  /**
+   * Pick a crossroad the way a competent player would, for the autoplay bot
+   * and the headless harness.
+   *
+   * This used to be `rng.pick(options)` — a uniform choice that ignored the
+   * player's own condition and so never chose to rest, even at zero energy.
+   * Since most crossroads cost energy and only a few restore it, that made
+   * energy a one-way ratchet: it sat at or below 10 for 38% of a 1000-scene
+   * run, which in turn locked every engine with an `energy >` gate out of
+   * roughly 40% of the game. That was an artifact of the player model, not
+   * of the game's balance, and it hid real routing behaviour behind a
+   * starvation that no real player would walk into.
+   *
+   * So: weight each option by how much it relieves whatever is currently
+   * scarce, and shy away from options that would drain an already-critical
+   * stat. Still random, still seed-reproducible — just not self-destructive.
+   */
   function autoPick(state, rng) {
     var options = offer(state, rng);
-    return rng.pick(options);
+    if (!options.length) return null;
+
+    return rng.weighted(options, function (opt) {
+      var w = 1, k, delta, level, scarcity;
+      for (k in opt.cost) {
+        if (!Object.prototype.hasOwnProperty.call(opt.cost, k)) continue;
+        delta = Number(opt.cost[k]) || 0;
+        level = state.stats[k];
+        if (typeof level !== 'number') continue;
+        scarcity = Math.max(0, (60 - level) / 60);        // 0 when healthy, 1 at zero
+        if (delta > 0) w += (delta / 8) * (0.5 + scarcity * 6);   // restores: want it badly when low
+        else if (delta < 0) w += (delta / 10) * (scarcity * 4);   // drains: avoid when already low
+      }
+      return Math.max(0.12, w);                            // never impossible
+    }) || options[0];
   }
 
   PS.crossroad = {

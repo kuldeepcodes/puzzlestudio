@@ -423,9 +423,56 @@ note(`outcomes: ${Object.entries(outcomeHits).map(([k, v]) => `${k} ${v}`).join(
 note(`blackouts: ${blackouts} · crossroads: ${crossroadPicks} · final depth ${state.depth} · tier T${state.tier()}`);
 note(`director reasons: ${Object.entries(reasonHits).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}×${v}`).join(', ')}`);
 
+/* ------------------------------------------------------- blackout recovery */
+
+// "Failure never ends the run" is a core design promise: at health 0 the
+// player blacks out, wakes with their pack gone and some health back, and the
+// Director routes them to a triage/allocation scene. Random incidence used to
+// exercise this, but once crossroad.autoPick started playing sensibly the bot
+// stopped dying altogether — so this drives the path directly rather than
+// hoping a long run stumbles into it.
+head('5. Blackout recovery (failure never ends the run)');
+
+{
+  const bs = PS.state.create({ runSeed: PS.rng.hash('blackout'), seedLabel: 'blackout' });
+  const bp = PS.profile.create();
+  const brng = PS.rng.create(PS.rng.hash('blackout', 'director'));
+
+  bs.inventory = ['rope', 'battery', 'ration'];
+  const opener = PS.director.first(bs, bp, brng);
+
+  let report = null;
+  try {
+    report = bs.applyResult(
+      { outcome: 'fail', stats: { health: -999 }, gain: [], lose: [], tags: [],
+        signals: { logic: 0, brute: 1, caution: 0, speed: 0, scavenge: 0 },
+        choice: null, summary: 'Driven to zero on purpose.' },
+      { engineId: opener.engine.id, engineName: opener.engine.name, skinId: opener.skin.id,
+        title: opener.skin.title, icon: opener.skin.icon, biome: opener.skin.biome }
+    );
+  } catch (e) {
+    thrown.push('blackout applyResult: ' + e.message);
+  }
+
+  ok(!!(report && report.blackout), 'health reaching 0 triggers a blackout, not a game over');
+  ok(bs.stats.health > 0, 'the player wakes with health restored', `health=${bs.stats.health}`);
+  ok(bs.inventory.length === 0, 'the pack is lost in the blackout', `still holding ${bs.inventory.join(', ')}`);
+
+  let after = null;
+  try { after = PS.director.next(bs, bp, brng); } catch (e) { thrown.push('blackout next: ' + e.message); }
+  ok(!!(after && after.engine), 'the Director still has somewhere to send the player');
+  if (after) {
+    const routed = after.engine.provides.indexOf('triage') >= 0 ||
+                   after.engine.provides.indexOf('medical') >= 0 ||
+                   after.reason === 'override:blackout';
+    ok(routed, 'a blackout routes toward triage/medical care',
+      `went to ${after.engine.id} (${after.reason}), provides: ${after.engine.provides.join(', ') || 'nothing'}`);
+  }
+}
+
 /* ------------------------------------------------ save / restore round trip */
 
-head('5. Save round-trip');
+head('6. Save round-trip');
 let restored = null;
 try {
   PS.save.save(state, profile);
@@ -442,7 +489,7 @@ if (restored) {
 
 /* ------------------------------------------------------ file:// guardrails */
 
-head('6. file:// guardrails');
+head('7. file:// guardrails');
 
 function walk(dir, out = []) {
   for (const f of fs.readdirSync(dir, { withFileTypes: true })) {

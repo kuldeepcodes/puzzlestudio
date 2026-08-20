@@ -265,13 +265,27 @@ different scenarios. There is no fixed schema; use the keys your engine needs.
 What *need* your engine can relieve. The Director raises your score sharply when the
 matching stat is low, and some hard overrides look for these exact tokens.
 
-| token | relieves | notes |
-|---|---|---|
-| `light_source`, `fire`, `power` | **light** | `light_source` is also a hard override target when light < 15 |
-| `medical`, `triage`, `shelter`, `rest` | **health** / **energy** | `triage` is the blackout override target |
-| `food` | **energy** | |
-| `ally`, `comfort`, `information`, `trade` | **morale** | `ally`/`trade` also get a big boost while the player has an ally |
-| `map`, `vantage`, `crossing`, `salvage`, `load_out` | routing only | referenced by `CHOICE_HINTS` |
+**Only the tokens below do anything.** A token that is not in this table is accepted and
+stored, but nothing reads it — it is a comment, not behaviour. Prefer a recognised token,
+or add a recognised sibling alongside your descriptive one.
+
+| token | effect |
+|---|---|
+| `light_source` | relieves **light** — and is the hard override target when light < 15 |
+| `fire`, `power` | relieve **light** |
+| `medical`, `triage` | relieve **health** — `triage` is the blackout override target |
+| `shelter`, `rest` | relieve **health** and **energy** |
+| `food` | relieves **energy** |
+| `ally`, `comfort`, `information`, `intel`, `trade` | relieve **morale**; `ally`/`trade`/`triage` also get a large boost for as long as the player has an ally |
+| `load_out` | routing — target of the `escape_code` + `force_door` override |
+| `map` | routing — target of the `escape_code` + `pick_lock` override |
+| `crossing` | routing — target of the fail-in-a-water-biome override |
+| `salvage`, `vantage` | routing only — referenced by `CHOICE_HINTS` |
+
+**Currently inert**, though several shipped engines declare them: `supplies`, `passage`,
+`access`, `contact`. They read well and cost nothing, but they will not route the player
+to you. If your engine hands back food or rations, say `food` as well as `supplies`; if it
+opens a way through, say `crossing` as well as `passage`.
 
 Claim only what your engine genuinely hands back. An engine that lists
 `provides: ['light_source']` but never puts light in `stats` will be summoned every
