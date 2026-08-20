@@ -5,10 +5,12 @@
    Self-contained: logic + 3 skins + its own CSS. No DOM access until mount().
 
    THE PUZZLE
-     A grid of conduit sections between a live source and a dead load. Every
+     A floor of conduit sections between a live source and a dead load. Every
      section is the right section; every section is pointing the wrong way.
-     Click one to turn it a quarter turn. Get a continuous run from the
-     source to the load and the thing at the end of it wakes up.
+     You walk the substation, stand at a junction and press E to turn it a
+     quarter turn. Get a continuous run from the source to the load and the
+     thing at the end of it wakes up. Restoring power is a physical circuit
+     of the room, and the run lights itself section by section as it takes.
 
    ALWAYS SOLVABLE
      The network is built first — a self-avoiding run from source to load,
@@ -21,7 +23,10 @@
    THIS IS THE LIGHT RESTORE
      The Director force-routes here whenever light drops under 15, so it asks
      for nothing: no items, no stats, no reading in the dark. Success is the
-     biggest single light swing in the game.
+     biggest single light swing in the game. Which means it has to be fully
+     playable with the mask almost shut, so the floor plan is known from the
+     start, the source burns whatever happens, and every section you energise
+     lights itself. Near-darkness is the mood here, never the obstacle.
 
    THE BRANCH
      Power restored, you decide where it goes: everything into the beacon,
@@ -337,50 +342,90 @@
     return n;
   }
 
+  /* ====================================================== ARENA GEOMETRY ==
+     The substation stops being a grid you click and becomes a floor you walk.
+     One junction every two tiles, plant lattice in between, so restoring the
+     run is a physical circuit of the room. Cell (cx,cy) -> tile (2+2cx,2+2cy). */
+
+  var SPAN = 2;
+  function tileX(cx) { return 2 + cx * SPAN; }
+  function tileY(cy) { return 2 + cy * SPAN; }
+
+  function floorPlan(n) {
+    var w = n * SPAN + 3, tiles = [], x, y;
+    for (y = 0; y < w; y++) {
+      tiles.push([]);
+      for (x = 0; x < w; x++) {
+        var edge = x === 0 || y === 0 || x === w - 1 || y === w - 1;
+        // Standing plant between every four junctions. Corridors run along
+        // every even row and column, so everything stays reachable.
+        var pillar = (x & 1) === 1 && (y & 1) === 1 && x >= 3 && y >= 3 && x <= w - 4 && y <= w - 4;
+        tiles[y].push(edge || pillar ? 1 : 0);
+      }
+    }
+    return { w: w, h: w, tiles: tiles };
+  }
+
+  /* Orientation is the whole puzzle, so a junction is drawn as the sides it
+     currently connects. Light strokes are dead metal; heavy strokes carry. */
+
+  var THIN = {
+    0: '\u00B7', 1: '\u2575', 2: '\u2576', 4: '\u2577', 8: '\u2574',
+    5: '\u2502', 10: '\u2500', 3: '\u2514', 6: '\u250C', 12: '\u2510', 9: '\u2518',
+    7: '\u251C', 14: '\u252C', 13: '\u2524', 11: '\u2534', 15: '\u253C'
+  };
+  var BOLD = {
+    0: '\u00B7', 1: '\u2579', 2: '\u257A', 4: '\u257B', 8: '\u2578',
+    5: '\u2503', 10: '\u2501', 3: '\u2517', 6: '\u250F', 12: '\u2513', 9: '\u251B',
+    7: '\u2523', 14: '\u2533', 13: '\u252B', 11: '\u253B', 15: '\u254B'
+  };
+
+  var DEAD_TINT = '#39424f';
+
+  /**
+   * The light mask radius. This engine is the Director's light restore — it is
+   * force-routed here whenever light drops under 15 — so the floor is legible
+   * at zero light by construction. What the dark takes is reach, not the
+   * puzzle: every section you energise lights itself and the room with it.
+   */
+  function arenaRadius(light) {
+    var l = light < 0 ? 0 : (light > 100 ? 100 : light);
+    return 2.05 + (l / 100) * 2.75;
+  }
+
   /* ================================================================ CSS == */
 
   var CSS = [
-    '.pz-circ{display:grid;grid-template-columns:minmax(0,1fr) minmax(232px,300px);gap:18px;align-items:start}',
-    '@media (max-width:860px){.pz-circ{grid-template-columns:1fr}}',
+    '.pz-circ{display:flex;flex-direction:column;gap:12px}',
 
-    '.pz-circ-board{display:grid;gap:4px;padding:12px;border-radius:12px;background:#05070a;',
-    '  border:1px solid var(--line);box-shadow:inset 0 0 60px rgba(0,0,0,.85);',
-    '  width:100%;max-width:520px;aspect-ratio:1/1;margin:0 auto}',
-    '.pz-circ-cell{position:relative;border-radius:6px;background:#0a0e14;border:1px solid #141a24;',
-    '  padding:0;cursor:default;overflow:hidden}',
-    '.pz-circ-cell.is-live{background:#0d141d;border-color:color-mix(in srgb,var(--acc) 42%,#141a24)}',
-    '.pz-circ-cell.is-turnable{cursor:pointer}',
-    '.pz-circ-cell.is-turnable:hover{border-color:var(--acc);background:#121a24}',
-    '.pz-circ-cell.is-fixed{background:#0d1119;border-color:#1e2634}',
-    '.pz-circ-cell:disabled{cursor:default}',
+    '.pz-circ-tips{display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:12px;color:var(--dim);line-height:1.6}',
+    '.pz-circ-tips strong{color:var(--text-2);font-weight:600}',
+    '.pz-circ-cap{font-family:var(--font-mono);font-size:10.5px;padding:2px 7px;border-radius:5px;',
+    '  background:#0c1016;border:1px solid var(--line);border-bottom-width:2px;color:var(--text-2)}',
 
-    '.pz-circ-pipe{position:absolute;background:#3a4353;border-radius:3px;',
+    '.pz-circ-key{display:flex;flex-wrap:wrap;gap:11px;font-size:11px;color:var(--dim)}',
+    '.pz-circ-key span{display:inline-flex;gap:5px;align-items:center}',
+
+    '.pz-circ-mimic{display:grid;gap:3px;padding:8px;border-radius:9px;background:#05070a;',
+    '  border:1px solid var(--line);box-shadow:inset 0 0 40px rgba(0,0,0,.8);margin-bottom:11px}',
+    '.pz-circ-dot{min-height:14px;aspect-ratio:1/1;border-radius:3px;background:#0b1017;border:1px solid #161d28;',
+    '  display:grid;place-items:center;font-size:9px;color:var(--dimmer);',
     '  transition:background .22s var(--ease),box-shadow .22s var(--ease)}',
-    '.pz-circ-cell.is-live .pz-circ-pipe{background:var(--acc);box-shadow:0 0 10px var(--acc-glow)}',
-    '.pz-circ-pipe.hub{left:38%;top:38%;width:24%;height:24%;border-radius:50%}',
-    '.pz-circ-pipe.n{left:43%;top:0;width:14%;height:54%}',
-    '.pz-circ-pipe.s{left:43%;top:46%;width:14%;height:54%}',
-    '.pz-circ-pipe.w{left:0;top:43%;width:54%;height:14%}',
-    '.pz-circ-pipe.e{left:46%;top:43%;width:54%;height:14%}',
-
-    '.pz-circ-node{position:absolute;inset:0;display:grid;place-items:center;font-size:clamp(11px,2.4vw,19px);',
-    '  z-index:2;color:var(--dimmer);transition:color .22s var(--ease),text-shadow .22s var(--ease)}',
-    '.pz-circ-cell.is-live .pz-circ-node{color:var(--acc-2);text-shadow:0 0 12px var(--acc-glow)}',
-
-    '.pz-circ-board.is-dim{filter:saturate(.55) brightness(.86)}',
-    '.pz-circ-board.is-done{box-shadow:inset 0 0 70px var(--acc-glow);animation:pzCircWake .7s var(--ease)}',
-    '@keyframes pzCircWake{0%{box-shadow:inset 0 0 0 rgba(0,0,0,0)}45%{box-shadow:inset 0 0 130px var(--acc-glow)}100%{box-shadow:inset 0 0 70px var(--acc-glow)}}',
+    '.pz-circ-dot.is-void{opacity:.14}',
+    '.pz-circ-dot.is-live{background:var(--acc-wash);border-color:var(--acc);color:var(--acc-2);',
+    '  box-shadow:0 0 9px var(--acc-glow)}',
 
     '.pz-circ-read{display:flex;flex-direction:column;gap:6px}',
-    '.pz-circ-read__r{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:11px;color:var(--dim)}',
+    '.pz-circ-read__r{display:flex;justify-content:space-between;gap:12px;',
+    '  font-family:var(--font-mono);font-size:11px;color:var(--dim)}',
     '.pz-circ-read__r b{color:var(--acc-2)}',
     '.pz-circ-read__r.is-bad b{color:var(--bad)}',
 
-    '.pz-circ-key{display:flex;flex-direction:column;gap:6px;font-size:11px;color:var(--dim);line-height:1.5}',
-    '.pz-circ-key span{display:inline-flex;gap:6px;align-items:center}',
-
     '.pz-circ-dark{font-size:12px;line-height:1.55;color:var(--warn);padding:9px 11px;border-radius:7px;',
-    '  background:rgba(230,180,85,.08);border:1px solid rgba(230,180,85,.3)}'
+    '  background:rgba(230,180,85,.08);border:1px solid rgba(230,180,85,.3);margin-bottom:11px}',
+
+    '.pz-circ-arrive{font-size:13px;line-height:1.6;color:var(--text-2);margin:2px 0 11px}',
+    '.pz-circ-arrive b{color:var(--acc-2)}'
   ].join('\n');
 
   /* ================================================================ MOUNT = */
@@ -392,120 +437,298 @@
     var C = puzzle.content;
     var n = puzzle.n;
     var finished = false;
-    var nodes = {};
+    var arena = null;
 
-    var board = h('div', {
-      class: 'pz-circ-board',
-      style: { gridTemplateColumns: 'repeat(' + n + ', 1fr)', gridTemplateRows: 'repeat(' + n + ', 1fr)' }
+    var junc = {};          // "x,y" -> handle for every network cell
+    var segs = [];          // decorative conduit between adjacent cells
+    var loadStation = null;
+    var panel = null;       // built the first time you walk to the load
+    var lastLive = -1;
+
+    var wrap = h('div', { class: 'pz-circ' });
+    var stage = h('div', {});
+    var tips = h('div', { class: 'pz-circ-tips' }, [
+      h('span', {}, [
+        h('b', { class: 'pz-circ-cap', text: 'W A S D' }), ' / ',
+        h('b', { class: 'pz-circ-cap', text: '\u2190\u2191\u2193\u2192' }),
+        ' walk \u00B7 hold or click the ', h('strong', { text: 'mouse' }), ' to go there \u00B7 ',
+        h('b', { class: 'pz-circ-cap', text: 'E' }), ' turns the section you are standing at'
+      ]),
+      h('div', { class: 'pz-circ-key' }, [
+        h('span', {}, [C.sourceIcon, ' ' + C.sourceName + ' \u2014 always live']),
+        h('span', {}, [C.loadIcon, ' ' + C.loadName + ' \u2014 walk here to draw the power']),
+        h('span', {}, [C.spurIcon, ' ' + C.spurName + ' \u2014 optional, worth extra light'])
+      ])
+    ]);
+    PS.ui.append(wrap, [stage, tips]);
+    PS.ui.append(el, wrap);
+
+    /* ------------------------------------------------------- degraded mode --
+       arena.js is core and always present, but a missing layer must never
+       strand the player in a scene they cannot leave.                        */
+    if (!PS.arena || typeof PS.arena.create !== 'function') {
+      PS.ui.append(stage, [
+        h('div', { class: 'pz-intro', text: C.live }),
+        h('div', { class: 'pz-choices' }, [
+          branchBtn('\uD83D\uDCE1', C.beacon, C.beaconDesc, 'signal'),
+          branchBtn('\uD83C\uDFEE', C.hand, C.handDesc, 'crawl')
+        ])
+      ]);
+      return;
+    }
+
+    /* -------------------------------------------------------------- arena -- */
+
+    arena = PS.arena.create(stage, {
+      map: floorPlan(n),
+      spawn: { x: 1, y: tileY(puzzle.source.y) },
+      avatar: '\uD83E\uDDCD',
+      light: state.stats.light,
+      lightCurve: arenaRadius,
+      darkness: 0.93,
+      memory: 0.36
     });
+    if (!arena) return;
+    teardownFns.push(function () { if (arena) { arena.destroy(); arena = null; } });
 
-    var readout = h('div', { class: 'pz-circ-read' });
-    var darkBox = h('div', {});
-    var actions = h('div', { class: 'pz-col' });
+    // You have the plan of this building in your head whether the lamp works
+    // or not. The dark takes the detail, and every section you connect gives
+    // a little of it back.
+    arena.revealAll();
 
-    /* --------------------------------------------------------- build grid */
-    for (var y = 0; y < n; y++) {
-      for (var x = 0; x < n; x++) {
-        (function (cx, cy) {
-          var c = puzzle.cells[key(cx, cy)];
-          var cell = h('button', {
-            type: 'button',
-            class: 'pz-circ-cell' + (c ? (c.fixed ? ' is-fixed' : ' is-turnable') : ''),
-            disabled: !c || c.fixed,
-            title: c ? (c.fixed ? 'Bolted down.' : 'Turn this ' + C.unit) : 'Empty casing.'
+    /* --------------------------------------------------------------- HUD --- */
+
+    var mPower = arena.meter('Run', '\u26A1');
+    var cLoad = arena.chip(C.loadName, C.loadIcon);
+    var cTurns = arena.chip('Turns', '\uD83D\uDD27');
+    var cSpur = arena.chip(C.spurName + 's', C.spurIcon);
+
+    arena.note('Walk to a ' + C.unit + ' and press E to turn it. Power spreads from the ' +
+      C.sourceName.toLowerCase() + ' \u2014 and lights the room as it goes.');
+    arena.button('\u21A9 Leave it dead', walkAway, 'pz-btn--danger');
+
+    /* ------------------------------------------------------------ the room - */
+
+    for (var i = 0; i < puzzle.order.length; i++) addCell(puzzle.order[i]);
+    addSegments();
+
+    function addCell(c) {
+      var tx = tileX(c.x), ty = tileY(c.y);
+
+      if (c.role === 'load') {
+        loadStation = arena.station({
+          x: tx, y: ty, icon: C.loadIcon, label: C.loadName,
+          hint: 'the draw panel', radius: 1.3, emits: 0,
+          onEnter: buildPanel
+        });
+        junc[key(c.x, c.y)] = loadStation;
+        return;
+      }
+
+      var fixed = !!c.fixed;
+      junc[key(c.x, c.y)] = arena.prop({
+        x: tx, y: ty,
+        icon: fixed ? (c.role === 'source' ? C.sourceIcon : C.spurIcon) : (THIN[liveMask(c)] || '\u00B7'),
+        label: fixed ? (c.role === 'source' ? C.sourceName : C.spurName) : C.unit,
+        hint: fixed ? 'bolted down' : 'E \u00B7 quarter turn',
+        trigger: 'press', once: false, botSkip: fixed,
+        radius: 0.9, glow: false, emits: 0, tint: DEAD_TINT,
+        onActivate: function () { if (fixed) bolted(c); else turn(c); }
+      });
+    }
+
+    /** A coupling on the floor between two neighbouring sections. Decorative:
+        radius is too small to ever become the nearest thing, so it never
+        steals the E prompt from the junction you are standing at. */
+    function addSegments() {
+      for (var s = 0; s < puzzle.order.length; s++) {
+        var c = puzzle.order[s];
+        for (var q = 0; q < 2; q++) {
+          var d = q === 0 ? 1 : 2;                       // east and south only
+          var nb = puzzle.cells[key(c.x + DX[d], c.y + DY[d])];
+          if (!nb) continue;
+          segs.push({
+            a: c, b: nb, d: d,
+            raw: arena.prop({
+              x: tileX(c.x) + DX[d], y: tileY(c.y) + DY[d],
+              icon: '', trigger: 'press', once: false, botSkip: true,
+              radius: 0.001, glow: false, emits: 0, tint: DEAD_TINT
+            }).raw
           });
-          if (c) cell.addEventListener('click', function () { turn(c); });
-          nodes[key(cx, cy)] = cell;
-          board.appendChild(cell);
-        })(x, y);
+        }
       }
     }
 
-    /* ------------------------------------------------------------- render */
+    /* ------------------------------------------------------------- actions - */
 
-    function paintCell(c, cell, live) {
-      PS.ui.clear(cell);
-      if (!c) { cell.className = 'pz-circ-cell'; return; }
-      var m = liveMask(c);
-      var isLive = !!live[key(c.x, c.y)];
-
-      cell.className = 'pz-circ-cell' +
-        (isLive ? ' is-live' : '') +
-        (c.fixed ? ' is-fixed' : ' is-turnable');
-
-      cell.appendChild(h('span', { class: 'pz-circ-pipe hub' }));
-      if (m & 1) cell.appendChild(h('span', { class: 'pz-circ-pipe n' }));
-      if (m & 2) cell.appendChild(h('span', { class: 'pz-circ-pipe e' }));
-      if (m & 4) cell.appendChild(h('span', { class: 'pz-circ-pipe s' }));
-      if (m & 8) cell.appendChild(h('span', { class: 'pz-circ-pipe w' }));
-
-      if (c.role === 'source') cell.appendChild(h('span', { class: 'pz-circ-node', text: C.sourceIcon }));
-      else if (c.role === 'load') cell.appendChild(h('span', { class: 'pz-circ-node', text: C.loadIcon }));
-      else if (c.role === 'spur') cell.appendChild(h('span', { class: 'pz-circ-node', text: C.spurIcon }));
+    function turn(c) {
+      if (finished || puzzle.solved || c.fixed) return;
+      c.rot = (c.rot + 1) & 3;
+      puzzle.moves++;
+      arena.dust(tileX(c.x), tileY(c.y), 5, '#f6d08a');
+      paint();
     }
 
+    function bolted(c) {
+      if (finished) return;
+      api.toast(c.role === 'source'
+        ? C.live
+        : 'The ' + C.spurName.toLowerCase() + ' is bolted down. Feed it and it comes up on its own.', 'info', 2600);
+    }
+
+    /* ------------------------------------------------------------- render -- */
+
     function paint() {
+      if (!arena || finished) return;
+
       var live = energised(puzzle);
-      for (var yy = 0; yy < n; yy++) {
-        for (var xx = 0; xx < n; xx++) {
-          paintCell(puzzle.cells[key(xx, yy)], nodes[key(xx, yy)], live);
-        }
+      var liveCount = 0, i, c, hnd, isLive;
+
+      for (i = 0; i < puzzle.order.length; i++) {
+        c = puzzle.order[i];
+        hnd = junc[key(c.x, c.y)];
+        if (!hnd) continue;
+        isLive = !!live[key(c.x, c.y)];
+        if (isLive) liveCount++;
+
+        if (!c.fixed) hnd.setIcon((isLive ? BOLD : THIN)[liveMask(c)] || '\u00B7');
+        hnd.raw.tint = isLive ? null : DEAD_TINT;     // null falls back to the skin accent
+        hnd.raw.glow = isLive;
+        hnd.raw.emits = isLive
+          ? (c.role === 'source' ? 2.5 : (c.role === 'load' ? 3.6 : 1.65))
+          : 0;
+      }
+
+      for (i = 0; i < segs.length; i++) {
+        var sg = segs[i];
+        var joined = !!(liveMask(sg.a) & (1 << sg.d)) && !!(liveMask(sg.b) & (1 << ((sg.d + 2) & 3)));
+        var hot = joined && !!live[key(sg.a.x, sg.a.y)] && !!live[key(sg.b.x, sg.b.y)];
+        sg.raw.icon = joined
+          ? (sg.d === 1 ? (hot ? '\u2501' : '\u2500') : (hot ? '\u2503' : '\u2502'))
+          : '';
+        sg.raw.tint = hot ? null : DEAD_TINT;
+        sg.raw.emits = hot ? 0.85 : 0;
       }
 
       var powered = !!live[key(puzzle.load.x, puzzle.load.y)];
       var lit = bonusLit(puzzle, live);
+      var total = puzzle.order.length;
 
-      PS.ui.clear(readout);
-      PS.ui.append(readout, [
+      mPower.set(Math.round(liveCount / total * 100), liveCount + ' / ' + total + ' live',
+        powered ? 'good' : (liveCount > 1 ? null : 'bad'));
+      cLoad.set(powered ? 'live' : 'dead', powered ? 'good' : 'bad');
+      cTurns.set(puzzle.moves + ' / ' + puzzle.minMoves + ' ref');
+      cSpur.set(lit + ' / ' + puzzle.bonus.length);
+
+      // Presentation only. The run's own light stat is not touched until
+      // finish() pays out — this is the room brightening, not the player.
+      arena.setLight(Math.min(100, state.stats.light + liveCount * 7));
+
+      if (liveCount > lastLive && lastLive >= 0 && !powered) {
+        arena.ping(tileX(puzzle.source.x), tileY(puzzle.source.y));
+      }
+      lastLive = liveCount;
+
+      paintPanel(live, powered, lit);
+
+      if (powered && !puzzle.solved) {
+        puzzle.solved = true;
+        api.flash();
+        api.toast(C.done, 'good', 3400);
+        arena.shake(5, 0.42);
+        arena.ping(tileX(puzzle.load.x), tileY(puzzle.load.y));
+        arena.dust(tileX(puzzle.load.x), tileY(puzzle.load.y), 14, '#f6d08a');
+        if (loadStation) loadStation.solve();
+      }
+    }
+
+    /* -------------------------------------------------- the load's panel --- */
+
+    function buildPanel(panelEl) {
+      panel = { note: h('div', {}), dots: {}, read: h('div', { class: 'pz-circ-read' }), draw: h('div', { class: 'pz-col' }) };
+      var mimic = h('div', {
+        class: 'pz-circ-mimic',
+        style: { gridTemplateColumns: 'repeat(' + n + ', 1fr)' }
+      });
+
+      for (var y = 0; y < n; y++) {
+        for (var x = 0; x < n; x++) {
+          var c = puzzle.cells[key(x, y)];
+          var dot = h('div', { class: 'pz-circ-dot' + (c ? '' : ' is-void'), text: c ? roleIcon(c) : '' });
+          panel.dots[key(x, y)] = dot;
+          mimic.appendChild(dot);
+        }
+      }
+
+      PS.ui.append(panelEl, [panel.note, mimic, panel.read, panel.draw]);
+      paint();
+    }
+
+    function roleIcon(c) {
+      if (c.role === 'source') return C.sourceIcon;
+      if (c.role === 'load') return C.loadIcon;
+      if (c.role === 'spur') return C.spurIcon;
+      return '';
+    }
+
+    function paintPanel(live, powered, lit) {
+      if (!panel) return;
+      var x, y, k;
+
+      for (y = 0; y < n; y++) {
+        for (x = 0; x < n; x++) {
+          k = key(x, y);
+          if (!panel.dots[k]) continue;
+          panel.dots[k].className = 'pz-circ-dot' +
+            (puzzle.cells[k] ? (live[k] ? ' is-live' : '') : ' is-void');
+        }
+      }
+
+      PS.ui.clear(panel.note);
+      if (!powered && state.stats.light < 15) {
+        panel.note.appendChild(h('div', { class: 'pz-circ-dark' }, [
+          'You are doing this by feel and by the glow off the live side. It still works: the ',
+          C.sourceName.toLowerCase(), ' is the only thing lit, and the light spreads as you connect it.'
+        ]));
+      }
+
+      PS.ui.clear(panel.read);
+      PS.ui.append(panel.read, [
         row(C.loadName, powered ? 'live' : 'dead', !powered),
         row(C.spurName + 's', lit + ' of ' + puzzle.bonus.length, false),
         row('Quarter turns made', String(puzzle.moves), false),
         row('Reference solution', puzzle.minMoves + ' turns', false)
       ]);
 
-      board.classList.toggle('is-dim', state.stats.light < 15 && !powered);
-      board.classList.toggle('is-done', powered);
-
-      PS.ui.clear(darkBox);
-      if (!powered && state.stats.light < 15) {
-        darkBox.appendChild(h('div', { class: 'pz-circ-dark' },
-          ['You are doing this by feel and by the glow off the live side. ',
-           'It still works: the ', C.sourceName.toLowerCase(), ' is the only thing lit, and light spreads as you connect it.']));
+      PS.ui.clear(panel.draw);
+      if (!powered) {
+        PS.ui.append(panel.draw, h('div', { class: 'pz-note' }, [
+          'Nothing to draw yet. Walk the run back toward the ', C.sourceName.toLowerCase(),
+          ' and turn whatever is out of true.'
+        ]));
+        return;
       }
 
-      if (powered && !puzzle.solved) {
-        puzzle.solved = true;
-        api.flash();
-        api.toast(C.done, 'good', 3400);
-        renderBranch(lit);
-      }
-
-      function row(k, v, bad) {
-        return h('div', { class: 'pz-circ-read__r' + (bad ? ' is-bad' : '') },
-          [h('span', { text: k }), h('b', { text: v })]);
-      }
-    }
-
-    /* ------------------------------------------------------------ actions */
-
-    function turn(c) {
-      if (finished || puzzle.solved || c.fixed) return;
-      c.rot = (c.rot + 1) & 3;
-      puzzle.moves++;
-      paint();
-    }
-
-    function renderBranch(lit) {
-      PS.ui.clear(actions);
-      PS.ui.append(actions, [
-        h('div', { class: 'pz-intro', text: C.done + ' ' + puzzle.moves + ' turns against a reference of ' +
-          puzzle.minMoves + (lit ? ', and ' + lit + ' ' + C.spurName.toLowerCase() + (lit === 1 ? '' : 's') + ' came up with it.' : '.') }),
+      PS.ui.append(panel.draw, [
+        h('div', { class: 'pz-circ-arrive' }, [
+          C.done + ' ',
+          h('b', { text: String(puzzle.moves) }), ' turns against a reference of ',
+          h('b', { text: String(puzzle.minMoves) }),
+          lit ? ', and ' + lit + ' ' + C.spurName.toLowerCase() + (lit === 1 ? '' : 's') + ' came up with it.' : '.'
+        ]),
         h('div', { class: 'pz-choices' }, [
           branchBtn('\uD83D\uDCE1', C.beacon, C.beaconDesc, 'signal'),
           branchBtn('\uD83C\uDFEE', C.hand, C.handDesc, 'crawl')
         ])
       ]);
+
+      function row(k2, v, bad) {
+        return h('div', { class: 'pz-circ-read__r' + (bad ? ' is-bad' : '') },
+          [h('span', { text: k2 }), h('b', { text: v })]);
+      }
     }
+
+    /* ------------------------------------------------------------ endings -- */
 
     function branchBtn(ic, title, desc, id) {
       return h('button', { class: 'pz-choice', type: 'button', onclick: function () { finishRun(id); } }, [
@@ -565,44 +788,8 @@
       });
     }
 
-    /* ------------------------------------------------------------- layout */
-
-    PS.ui.append(actions, [
-      h('button', { class: 'pz-btn pz-btn--danger pz-btn--sm', type: 'button', onclick: walkAway },
-        ['\u21A9 Leave it dead'])
-    ]);
-
-    PS.ui.append(el, h('div', { class: 'pz-circ' }, [
-      h('div', { class: 'pz-col' }, [
-        board,
-        h('div', { class: 'pz-note' }, [
-          'Click any section to turn it a quarter turn. ',
-          h('strong', { text: C.sourceName + ' and ' + C.loadName.toLowerCase() + ' are bolted down' }),
-          ' \u2014 everything between them is not.'
-        ])
-      ]),
-      h('div', { class: 'pz-col' }, [
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'Panel' }),
-          readout
-        ]),
-        darkBox,
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'Legend' }),
-          h('div', { class: 'pz-circ-key' }, [
-            h('span', {}, [C.sourceIcon, ' ' + C.sourceName + ' \u2014 always live']),
-            h('span', {}, [C.loadIcon, ' ' + C.loadName + ' \u2014 what you are trying to wake']),
-            h('span', {}, [C.spurIcon, ' ' + C.spurName + ' \u2014 optional, worth extra light'])
-          ])
-        ]),
-        h('div', { class: 'pz-card' }, [
-          h('div', { class: 'pz-card__head', text: 'Draw' }),
-          actions
-        ])
-      ])
-    ]));
-
     paint();
+    arena.focus();
   }
 
   function unmount() {
