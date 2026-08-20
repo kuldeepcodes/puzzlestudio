@@ -672,6 +672,29 @@ deep-link a specific run.
 - [ ] `autoSolve()` and `hint()` written
 - [ ] `node tools/smoke-test.js` prints PASS
 
+### If you add a guard, test it degenerate
+
+Five real bugs on this project came from guards that read as correct and carried
+nothing. Every one was written to catch a failure that had *already happened*, so it
+was shaped around the case in front of its author — and the intended case is precisely
+the one you have in mind while writing, so the boundary is by definition the one you
+don't. That asymmetry doesn't go away with care.
+
+So after writing a guard, don't ask whether it catches the failure you meant. Ask what
+it does when the thing it measures is **degenerate rather than wrong**:
+
+| the guard | the degenerate case | what actually happened |
+|---|---|---|
+| a weight of `0.05` on "give up" | a pool with **one** element | weighted choice ignores weight; the bot surrendered every time |
+| a `RELIEF` key named `'information'` | a name matching **nothing** | engines declare `'intel'`; the rule could never fire |
+| an override branch | a count of **zero** | `picked-lock` ran 3 times per 1000 and nothing asserted on it |
+| a solver seeded with `safe = {}` | an input set that is **empty** | already-safe cells read as unknown; 83% of deductions lost |
+| a liveness assertion | a sample **too small to contain the event** | short runs failed with nothing wrong |
+
+A guard that cannot verify something should say so, not pass quietly and not fail
+loudly. The liveness check is the worked example: below its floor it prints what it
+did not see and does not assert. **Degrade honestly.**
+
 ---
 
 ## 14. A complete minimal engine, heavily commented
