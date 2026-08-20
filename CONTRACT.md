@@ -711,13 +711,26 @@ gets ticked without being done, whereas *a pool of one* and *a name matching not
 are things you can actually go and check in five minutes. The list is meant to grow.
 
 One caution learned from writing it: the solver row originally carried a specific
-figure for how much detection was lost, taken from the report that found the bug. An
-independent re-measurement with a different sampling regime got a materially different
-number — both were real measurements of a real bug, but the magnitude turned out to
-depend heavily on how much of the board had been revealed. **State the mechanism, which
-reproduces; be careful quoting a headline number that might not.** That is the same
-*degrade honestly* rule applied to documentation rather than to code: the corrected row
-claims the thing that reproduces and declines to claim the thing that doesn't.
+figure for how much detection was lost. Three independent measurements of that single
+bug produced **83%, 10.5% and 15.6%** — and all three were correctly computed. The
+disagreement was never arithmetic. It came from two free parameters that a percentage
+hides:
+
+- **The denominator.** "Of all deductions on the board" counts cells nobody would ever
+  step on; "of the falls where the answer was genuinely *yes*" is what the classifier
+  actually operates on. Only the second matches the question the code asks.
+- **The state you sample from.** Walking a route reveals little, so few hazards are
+  provable at all; flooding the reachable area reveals almost everything, so most are.
+  That single choice moved "how many hazards were provable" from 15% to 78%, which
+  dominates the ratio regardless of which denominator you pick.
+
+So: **state the mechanism, which reproduces exactly; be careful quoting a headline
+number that might not.** A ratio with the wrong denominator — or the right denominator
+over the wrong state distribution — is a proxy that has drifted from its property, in
+exactly the way the grep row describes. It just drifts quietly, because it still looks
+like a measurement of the thing. That is the same *degrade honestly* rule applied to
+documentation rather than to code: the corrected row claims what reproduces and
+declines to claim what doesn't.
 
 And the last row is worth reading twice, because it is the general case of the other
 five. A marker is a **proxy** for the property you care about, and a proxy drifts from
