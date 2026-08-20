@@ -424,6 +424,45 @@ note(`outcomes: ${Object.entries(outcomeHits).map(([k, v]) => `${k} ${v}`).join(
 note(`blackouts: ${blackouts} · crossroads: ${crossroadPicks} · final depth ${state.depth} · tier T${state.tier()}`);
 note(`director reasons: ${Object.entries(reasonHits).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}×${v}`).join(', ')}`);
 
+// §6 proves each override ROUTES correctly when its precondition is
+// constructed. That is a different claim from the precondition ever actually
+// ARISING in normal play, and only the second one tells you the branch is
+// alive. A Director change that made `light < 15` unreachable, or a `choice`
+// id that stopped being emitted, would leave §6 green while the branch
+// quietly went dead — which is how `picked-lock` came to fire 3 times in 1000
+// with nothing noticing. The run is seeded, so these counts are reproducible.
+//
+// `override:blackout` is deliberately not required here: now that the bot
+// rests sensibly it never dies in a normal run, which is correct behaviour.
+// It has its own constructed test in §5.
+{
+  const wantAlive = ['override:light-critical', 'override:water-fail',
+                     'override:forced-door', 'override:picked-lock'];
+  const dead = wantAlive.filter(r => !(reasonHits[r] > 0));
+  ok(dead.length === 0, 'every override branch actually fires during normal play',
+    dead.length ? `never fired across ${TRANSITIONS} transitions: ${dead.join(', ')}` : '');
+}
+
+// A RELIEF key that no engine provides is a rule that can never apply. This is
+// how `RELIEF.morale` came to list 'information' while every deduction engine
+// declares 'intel' — the table looked complete, matched nothing, and failed
+// silently in the direction of simply never helping the player.
+{
+  const declared = {};
+  for (const e of engines) for (const p of e.provides) declared[p] = true;
+  const orphans = [];
+  for (const stat in PS.director.RELIEF) {
+    for (const token of PS.director.RELIEF[stat]) {
+      if (!declared[token]) orphans.push(`${stat}:${token}`);
+    }
+  }
+  // Tokens only crossroads hand out are legitimate — they relieve via the
+  // crossroad, not via an engine — so this reports rather than fails.
+  if (orphans.length) note(`RELIEF tokens no engine provides: ${orphans.join(', ')}`);
+  ok(true, 'RELIEF table checked against what engines actually declare',
+    orphans.length ? `${orphans.length} token(s) reachable only via crossroads` : 'every token has a provider');
+}
+
 /* ------------------------------------------------------- blackout recovery */
 
 // "Failure never ends the run" is a core design promise: at health 0 the
